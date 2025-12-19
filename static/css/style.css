@@ -1,0 +1,465 @@
+/* Современный милый стиль для сайта рецептов */
+
+:root {
+    --primary: #ff85a2;      /* Нежно-розовый */
+    --secondary: #a3d9b1;    /* Мятный */
+    --accent: #ffd166;       /* Желтый */
+    --light: #fff9f0;        /* Кремовый */
+    --dark: #333333;         /* Темный */
+    --text: #5a5a5a;         /* Серый текст */
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --radius: 20px;
+    --transition: all 0.3s ease;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Nunito', sans-serif;
+    background: linear-gradient(135deg, #fff9f0 0%, #fef5e7 100%);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Хедер */
+.header {
+    background: white;
+    box-shadow: var(--shadow);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    border-bottom: 3px solid var(--primary);
+}
+
+.header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo i {
+    font-size: 2.5rem;
+    color: var(--primary);
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.logo h1 {
+    font-family: 'Pacifico', cursive;
+    font-size: 1.8rem;
+    color: var(--dark);
+    background: linear-gradient(45deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.nav a, .btn-login, .btn-register {
+    text-decoration: none;
+    color: var(--dark);
+    padding: 10px 20px;
+    border-radius: 50px;
+    transition: var(--transition);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav a:hover {
+    background: var(--primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.btn-login {
+    background: var(--light);
+    border: 2px solid var(--secondary);
+}
+
+.btn-register {
+    background: var(--secondary);
+    color: white;
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.username {
+    background: var(--light);
+    padding: 8px 15px;
+    border-radius: 50px;
+    border: 2px dashed var(--accent);
+    font-weight: 600;
+}
+
+.btn-logout, .btn-danger {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-logout {
+    background: var(--light);
+    color: var(--dark);
+    border: 2px solid var(--primary);
+}
+
+.btn-danger {
+    background: #ff6b6b;
+    color: white;
+}
+
+.btn-logout:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #ff4757;
+    transform: scale(1.05);
+}
+
+/* Карточки рецептов */
+.recipes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 30px;
+    padding: 40px 0;
+}
+
+.recipe-card {
+    background: white;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    position: relative;
+    border: 2px solid transparent;
+}
+
+.recipe-card:hover {
+    transform: translateY(-10px);
+    border-color: var(--primary);
+    box-shadow: 0 15px 30px rgba(255, 133, 162, 0.2);
+}
+
+.recipe-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-bottom: 3px solid var(--accent);
+}
+
+.recipe-content {
+    padding: 20px;
+}
+
+.recipe-title {
+    font-size: 1.4rem;
+    color: var(--dark);
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.recipe-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.recipe-ingredients {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.ingredient-tag {
+    background: var(--light);
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    border: 1px solid var(--secondary);
+}
+
+.recipe-steps {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 2px dotted var(--accent);
+}
+
+.step-item {
+    margin-bottom: 10px;
+    padding-left: 20px;
+    position: relative;
+}
+
+.step-item:before {
+    content: "🥄";
+    position: absolute;
+    left: 0;
+}
+
+/* Поиск */
+.search-container {
+    background: white;
+    padding: 30px;
+    border-radius: var(--radius);
+    margin: 40px auto;
+    max-width: 800px;
+    box-shadow: var(--shadow);
+    border: 2px solid var(--secondary);
+}
+
+.search-box {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 15px;
+    border: 2px solid var(--secondary);
+    border-radius: 50px;
+    font-size: 1rem;
+    outline: none;
+    transition: var(--transition);
+}
+
+.search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(255, 133, 162, 0.2);
+}
+
+.search-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-btn:hover {
+    background: #ff6b95;
+    transform: scale(1.05);
+}
+
+.search-mode {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.mode-btn {
+    padding: 10px 20px;
+    border: 2px solid var(--secondary);
+    background: white;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.mode-btn.active {
+    background: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+}
+
+/* Формы */
+.form-container {
+    max-width: 500px;
+    margin: 40px auto;
+    background: white;
+    padding: 40px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.form-title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: var(--dark);
+    font-size: 2rem;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--dark);
+}
+
+.form-input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 15px;
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.form-input:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255, 133, 162, 0.2);
+}
+
+.btn-submit {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(45deg, var(--primary), var(--accent));
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-top: 20px;
+}
+
+.btn-submit:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(255, 133, 162, 0.3);
+}
+
+/* Футер */
+.footer {
+    margin-top: auto;
+    background: var(--dark);
+    color: white;
+    padding: 40px 0;
+    border-top: 5px solid var(--primary);
+}
+
+.footer .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.student-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.student-info i {
+    font-size: 3rem;
+    color: var(--accent);
+}
+
+.student-info h3 {
+    font-size: 1.3rem;
+    margin-bottom: 5px;
+}
+
+.student-info p {
+    opacity: 0.8;
+}
+
+.footer-links {
+    display: flex;
+    gap: 20px;
+}
+
+.footer-links a {
+    color: white;
+    text-decoration: none;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.footer-links a:hover {
+    color: var(--accent);
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.recipe-card {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .header .container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .recipes-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .footer .container {
+        flex-direction: column;
+        gap: 30px;
+        text-align: center;
+    }
+    
+    .search-box {
+        flex-direction: column;
+    }
+}

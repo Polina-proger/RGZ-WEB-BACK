@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - Рецепты Полины{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h2><i class="fas fa-heart"></i> Добро пожаловать в мир вкусных рецептов!</h2>
+        <p>Более 100 проверенных рецептов для каждого дня</p>
+        <div class="hero-stats">
+            <div class="stat">
+                <i class="fas fa-utensils"></i>
+                <span>100+ рецептов</span>
+            </div>
+            <div class="stat">
+                <i class="fas fa-clock"></i>
+                <span>Быстрое приготовление</span>
+            </div>
+            <div class="stat">
+                <i class="fas fa-star"></i>
+                <span>Проверено шефом</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="categories">
+    <h3><i class="fas fa-tags"></i> Категории рецептов</h3>
+    <div class="category-tags">
+        <button class="category-btn active" data-category="all">Все</button>
+        <button class="category-btn" data-category="Завтрак">Завтраки</button>
+        <button class="category-btn" data-category="Обед">Обеды</button>
+        <button class="category-btn" data-category="Ужин">Ужины</button>
+        <button class="category-btn" data-category="Десерт">Десерты</button>
+        <button class="category-btn" data-category="Выпечка">Выпечка</button>
+        <button class="category-btn" data-category="Напитки">Напитки</button>
+        <button class="category-btn" data-category="Диетическое">Диетическое</button>
+    </div>
+</div>
+
+<div class="featured-recipes">
+    <div class="section-header">
+        <h3><i class="fas fa-crown"></i> Популярные рецепты</h3>
+        <a href="{{ url_for('search_page') }}" class="view-all">
+            <i class="fas fa-search"></i> Все рецепты
+        </a>
+    </div>
+    
+    <div id="recipes-container" class="recipes-grid">
+        <!-- Рецепты загружаются через JavaScript -->
+        <div class="loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Загружаем вкусные рецепты...</p>
+        </div>
+    </div>
+    
+    <div id="pagination" class="pagination">
+        <!-- Пагинация -->
+    </div>
+</div>
+
+<div class="feature-section">
+    <div class="feature-card">
+        <i class="fas fa-search feature-icon"></i>
+        <h4>Умный поиск</h4>
+        <p>Находите рецепты по названию или ингредиентам</p>
+    </div>
+    <div class="feature-card">
+        <i class="fas fa-user-shield feature-icon"></i>
+        <h4>Только проверенное</h4>
+        <p>Все рецепты проверены нашими поварами</p>
+    </div>
+    <div class="feature-card">
+        <i class="fas fa-mobile-alt feature-icon"></i>
+        <h4>Доступно везде</h4>
+        <p>Работает на всех устройствах</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Загрузка рецептов
+    loadRecipes();
+    
+    // Фильтрация по категориям
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            const category = this.dataset.category;
+            if(category === 'all') {
+                loadRecipes();
+            } else {
+                loadRecipesByCategory(category);
+            }
+        });
+    });
+});
+
+async function loadRecipesByCategory(category) {
+    const response = await fetch(`/api/recipes?category=${category}&per_page=12`);
+    const data = await response.json();
+    
+    if(data.recipes && data.recipes.length > 0) {
+        renderRecipes(data.recipes);
+    } else {
+        document.getElementById('recipes-container').innerHTML = `
+            <div class="no-recipes">
+                <i class="fas fa-search" style="font-size: 4rem; color: var(--primary);"></i>
+                <h3>Рецепты не найдены</h3>
+                <p>Попробуйте другую категорию</p>
+            </div>
+        `;
+    }
+}
+
+function renderPagination(data) {
+    const pagination = document.getElementById('pagination');
+    if(!pagination || data.pages <= 1) return;
+    
+    let html = '<div class="pagination-controls">';
+    
+    // Кнопка "Назад"
+    if(data.current_page > 1) {
+        html += `<button onclick="loadRecipes(${data.current_page - 1})"><i class="fas fa-chevron-left"></i></button>`;
+    }
+    
+    // Номера страниц
+    for(let i = 1; i <= data.pages; i++) {
+        if(i === data.current_page) {
+            html += `<button class="active">${i}</button>`;
+        } else {
+            html += `<button onclick="loadRecipes(${i})">${i}</button>`;
+        }
+    }
+    
+    // Кнопка "Вперед"
+    if(data.current_page < data.pages) {
+        html += `<button onclick="loadRecipes(${data.current_page + 1})"><i class="fas fa-chevron-right"></i></button>`;
+    }
+    
+    html += '</div>';
+    pagination.innerHTML = html;
+}
+
+function viewRecipe(id) {
+    window.location.href = `/recipe/${id}`;
+}
+</script>
+
+<style>
+.hero-section {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    border-radius: var(--radius);
+    padding: 60px 40px;
+    margin: 40px 0;
+    color: white;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.hero-content h2 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+    font-family: 'Pacifico', cursive;
+}
+
+.hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.stat i {
+    font-size: 2.5rem;
+    color: var(--light);
+}
+
+.stat span {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.categories {
+    background: white;
+    padding: 30px;
+    border-radius: var(--radius);
+    margin: 40px 0;
+    box-shadow: var(--shadow);
+}
+
+.category-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.category-btn {
+    padding: 10px 20px;
+    border: 2px solid var(--secondary);
+    background: white;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 600;
+}
+
+.category-btn:hover, .category-btn.active {
+    background: var(--secondary);
+    color: white;
+    transform: scale(1.05);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.view-all {
+    background: var(--primary);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 50px;
+    text-decoration: none;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.view-all:hover {
+    background: #ff6b95;
+    transform: translateY(-2px);
+}
+
+.feature-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    margin: 60px 0;
+}
+
+.feature-card {
+    background: white;
+    padding: 30px;
+    border-radius: var(--radius);
+    text-align: center;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    border: 2px solid transparent;
+}
+
+.feature-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-10px);
+}
+
+.feature-icon {
+    font-size: 3rem;
+    color: var(--primary);
+    margin-bottom: 20px;
+}
+
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 40px;
+}
+
+.pagination-controls button {
+    padding: 10px 15px;
+    border: 2px solid var(--secondary);
+    background: white;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.pagination-controls button.active {
+    background: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+}
+
+.pagination-controls button:hover:not(.active) {
+    background: var(--light);
+}
+
+.loading {
+    text-align: center;
+    padding: 60px;
+    grid-column: 1 / -1;
+}
+
+.loading i {
+    font-size: 3rem;
+    color: var(--primary);
+    margin-bottom: 20px;
+}
+
+.no-recipes {
+    text-align: center;
+    padding: 60px;
+    grid-column: 1 / -1;
+}
+</style>
+{% endblock %}

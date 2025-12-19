@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Вход - Рецепты Полины{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <i class="fas fa-sign-in-alt auth-icon"></i>
+            <h2>Вход в аккаунт</h2>
+            <p>Войдите, чтобы сохранять любимые рецепты</p>
+        </div>
+        
+        <form id="login-form" class="auth-form">
+            <div class="form-group">
+                <label for="username"><i class="fas fa-user"></i> Логин</label>
+                <input type="text" id="username" name="username" required 
+                       placeholder="Введите ваш логин" class="form-input"
+                       pattern="[a-zA-Z0-9_-]{3,50}"
+                       title="Только латинские буквы, цифры, _ или -">
+            </div>
+            
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Пароль</label>
+                <input type="password" id="password" name="password" required 
+                       placeholder="Введите ваш пароль" class="form-input"
+                       minlength="8">
+                <div class="password-info">
+                    <small>Минимум 8 символов, буквы и цифры</small>
+                </div>
+            </div>
+            
+            <div class="form-options">
+                <label class="checkbox">
+                    <input type="checkbox" name="remember">
+                    <span>Запомнить меня</span>
+                </label>
+            </div>
+            
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-sign-in-alt"></i> Войти
+            </button>
+            
+            <div class="auth-links">
+                <p>Нет аккаунта? <a href="{{ url_for('register_page') }}">Зарегистрируйтесь</a></p>
+            </div>
+        </form>
+        
+        <div class="demo-accounts">
+            <h4><i class="fas fa-key"></i> Тестовые аккаунты:</h4>
+            <div class="demo-account">
+                <strong>Администратор:</strong>
+                <code>admin / Admin123!</code>
+            </div>
+            <div class="demo-account">
+                <strong>Пользователь:</strong>
+                <code>user / User123!</code>
+            </div>
+        </div>
+    </div>
+    
+    <div class="auth-side">
+        <div class="welcome-message">
+            <h3><i class="fas fa-heart"></i> С возвращением!</h3>
+            <p>Войдите в свой аккаунт, чтобы:</p>
+            <ul>
+                <li><i class="fas fa-check"></i> Сохранять любимые рецепты</li>
+                <li><i class="fas fa-check"></i> Получать персональные рекомендации</li>
+                <li><i class="fas fa-check"></i> Создавать списки покупок</li>
+                {% if not user.is_authenticated %}
+                <li><i class="fas fa-crown"></i> Для администраторов: управлять рецептами</li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('login-form');
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        
+        // Простая валидация
+        if(username.length < 3) {
+            showNotification('Логин должен быть минимум 3 символа', 'error');
+            return;
+        }
+        
+        if(password.length < 8) {
+            showNotification('Пароль должен быть минимум 8 символов', 'error');
+            return;
+        }
+        
+        // Проверка на русские буквы
+        const russianRegex = /[а-яА-Я]/;
+        if(russianRegex.test(username) || russianRegex.test(password)) {
+            showNotification('Используйте только латинские буквы', 'error');
+            return;
+        }
+        
+        const loginBtn = form.querySelector('.btn-submit');
+        const originalText = loginBtn.innerHTML;
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Вход...';
+        loginBtn.disabled = true;
+        
+        try {
+            await login(username, password);
+        } catch (error) {
+            console.error('Login error:', error);
+        } finally {
+            loginBtn.innerHTML = originalText;
+            loginBtn.disabled = false;
+        }
+    });
+});
+</script>
+
+<style>
+.auth-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin: 40px 0;
+}
+
+@media (max-width: 768px) {
+    .auth-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.auth-card {
+    background: white;
+    padding: 40px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 2px solid var(--secondary);
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.auth-icon {
+    font-size: 3rem;
+    color: var(--primary);
+    margin-bottom: 20px;
+}
+
+.auth-form .form-group {
+    margin-bottom: 25px;
+}
+
+.password-info {
+    margin-top: 8px;
+    color: var(--text);
+    opacity: 0.7;
+}
+
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.checkbox input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+
+.auth-links {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 25px;
+    border-top: 1px solid #eee;
+}
+
+.auth-links a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+}
+
+.demo-accounts {
+    margin-top: 30px;
+    padding: 20px;
+    background: var(--light);
+    border-radius: 15px;
+    border-left: 4px solid var(--accent);
+}
+
+.demo-account {
+    margin: 10px 0;
+    padding: 10px;
+    background: white;
+    border-radius: 10px;
+    font-family: monospace;
+}
+
+.demo-account code {
+    display: block;
+    padding: 5px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    margin-top: 5px;
+}
+
+.auth-side {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    padding: 40px;
+    border-radius: var(--radius);
+    color: white;
+}
+
+.welcome-message h3 {
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+}
+
+.welcome-message ul {
+    list-style: none;
+    margin-top: 25px;
+}
+
+.welcome-message li {
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.welcome-message li i {
+    color: var(--accent);
+}
+</style>
+{% endblock %}
