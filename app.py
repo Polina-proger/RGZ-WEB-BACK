@@ -34,8 +34,8 @@ class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    ingredients = db.Column(db.Text, nullable=False)
-    steps = db.Column(db.Text, nullable=False)
+    ingredients = db.Column(db.Text, nullable=False)  # Простой текст, каждая строка = ингредиент
+    steps = db.Column(db.Text, nullable=False)       # Простой текст, каждая строка = шаг
     cooking_time = db.Column(db.Integer)
     difficulty = db.Column(db.String(20))
     category = db.Column(db.String(50))
@@ -44,38 +44,61 @@ class Recipe(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     
     def to_dict(self):
-        # Безопасная обработка JSON для ingredients
-        try:
-            ingredients_data = json.loads(self.ingredients) if self.ingredients else []
-        except json.JSONDecodeError:
-            # Если не валидный JSON, возвращаем как простой список
-            if self.ingredients:
-                ingredients_data = [self.ingredients]
-            else:
-                ingredients_data = []
-        
-        # Безопасная обработка JSON для steps
-        try:
-            steps_data = json.loads(self.steps) if self.steps else []
-        except json.JSONDecodeError:
-            # Если не валидный JSON, возвращаем как простой список
-            if self.steps:
-                steps_data = [self.steps]
-            else:
-                steps_data = []
-        
+        """Преобразование рецепта в словарь для API"""
         return {
             'id': self.id,
-            'title': self.title,
-            'description': self.description,
-            'ingredients': ingredients_data,
-            'steps': steps_data,
-            'cooking_time': self.cooking_time,
-            'difficulty': self.difficulty,
-            'category': self.category,
-            'image_url': self.image_url,
+            'title': self.title or '',
+            'description': self.description or '',
+            'ingredients': self.get_ingredients_list(),
+            'steps': self.get_steps_list(),
+            'cooking_time': self.cooking_time or 0,
+            'difficulty': self.difficulty or '',
+            'category': self.category or '',
+            'image_url': self.image_url or '/static/img/default.jpg',
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else ''
         }
+    
+    def get_ingredients_list(self):
+        """Получить ингредиенты как список"""
+        if not self.ingredients:
+            return []
+        
+        # Если это JSON строка (старый формат)
+        if self.ingredients.strip().startswith('['):
+            try:
+                ingredients_data = json.loads(self.ingredients)
+                if isinstance(ingredients_data, list):
+                    return ingredients_data
+            except:
+                pass
+        
+        # Разбиваем по строкам, удаляем пустые
+        return [line.strip() for line in self.ingredients.split('\n') if line.strip()]
+    
+    def get_steps_list(self):
+        """Получить шаги как список"""
+        if not self.steps:
+            return []
+        
+        # Если это JSON строка (старый формат)
+        if self.steps.strip().startswith('['):
+            try:
+                steps_data = json.loads(self.steps)
+                if isinstance(steps_data, list):
+                    return steps_data
+            except:
+                pass
+        
+        # Разбиваем по строкам, удаляем пустые
+        return [line.strip() for line in self.steps.split('\n') if line.strip()]
+    
+    def get_ingredients_text(self):
+        """Получить ингредиенты как текст для формы"""
+        return self.ingredients or ''
+    
+    def get_steps_text(self):
+        """Получить шаги как текст для формы"""
+        return self.steps or ''
 
 # Инициализация базы данных с тестовыми данными
 def init_database():
@@ -97,8 +120,8 @@ def init_database():
                 {
                     'title': 'Панкейки с кленовым сиропом',
                     'description': 'Пушистые американские блинчики на завтрак',
-                    'ingredients': json.dumps(["200г муки", "300мл молока", "2 яйца", "2 ст.л. сахара", "2 ч.л. разрыхлителя", "щепотка соли"]),
-                    'steps': json.dumps(["Смешать сухие ингредиенты", "Добавить яйца и молоко, перемешать", "Жарить на сковороде по 2-3 минуты с каждой стороны", "Подавать с кленовым сиропом"]),
+                    'ingredients': "200г муки\n300мл молока\n2 яйца\n2 ст.л. сахара\n2 ч.л. разрыхлителя\nщепотка соли",
+                    'steps': "Смешать сухие ингредиенты\nДобавить яйца и молоко, перемешать\nЖарить на сковороде по 2-3 минуты с каждой стороны\nПодавать с кленовым сиропом",
                     'cooking_time': 20,
                     'difficulty': 'Легкий',
                     'category': 'Завтрак'
@@ -106,8 +129,8 @@ def init_database():
                 {
                     'title': 'Салат Цезарь',
                     'description': 'Классический салат с курицей и сухариками',
-                    'ingredients': json.dumps(["200г куриного филе", "100г пармезана", "1 пучок салата романо", "100г сухариков", "2 яйца", "соус цезарь"]),
-                    'steps': json.dumps(["Обжарить куриное филе", "Отварить яйца", "Нарезать салат", "Смешать все ингредиенты", "Заправить соусом"]),
+                    'ingredients': "200г куриного филе\n100г пармезана\n1 пучок салата романо\n100г сухариков\n2 яйца\nсоус цезарь",
+                    'steps': "Обжарить куриное филе\nОтварить яйца\nНарезать салат\nСмешать все ингредиенты\nЗаправить соусом",
                     'cooking_time': 25,
                     'difficulty': 'Легкий',
                     'category': 'Обед'
@@ -180,7 +203,10 @@ def edit_recipe_page(recipe_id):
         return redirect(url_for('login_page'))
     
     recipe = Recipe.query.get_or_404(recipe_id)
-    return render_template('edit_recipe.html', recipe=recipe)
+    return render_template('edit_recipe.html', 
+                         recipe=recipe,
+                         ingredients_text=recipe.get_ingredients_text(),
+                         steps_text=recipe.get_steps_text())
 
 # ========== API ДЛЯ УПРАВЛЕНИЯ РЕЦЕПТАМИ ==========
 
@@ -191,11 +217,53 @@ def get_all_recipes():
     return jsonify({'recipes': [r.to_dict() for r in recipes]})
 
 # Получить один рецепт
-@app.route('/api/recipes/<int:recipe_id>')
-def get_recipe(recipe_id):
+@app.route('/api/recipes/<int:recipe_id>', methods=['PUT'])
+def api_update_recipe(recipe_id):
+    if not session.get('is_admin'):
+        return jsonify({'error': 'Требуются права администратора'}), 403
+    
     recipe = Recipe.query.get_or_404(recipe_id)
-    return jsonify(recipe.to_dict())
-
+    
+    try:
+        data = request.json
+        
+        if 'title' in data:
+            recipe.title = data['title'].strip()
+        
+        if 'description' in data:
+            recipe.description = data['description'].strip()
+        
+        if 'ingredients' in data:
+            recipe.ingredients = data['ingredients'].strip()  # ← ТЕКСТ
+        
+        if 'steps' in data:
+            recipe.steps = data['steps'].strip()  # ← ТЕКСТ
+        
+        if 'cooking_time' in data:
+            try:
+                recipe.cooking_time = int(data['cooking_time'])
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Время приготовления должно быть числом'}), 400
+        
+        if 'difficulty' in data:
+            recipe.difficulty = data['difficulty']
+        
+        if 'category' in data:
+            recipe.category = data['category']
+        
+        if 'image_url' in data:
+            recipe.image_url = data['image_url']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Рецепт успешно обновлен!',
+            'recipe': recipe.to_dict()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 # Добавить рецепт (только админ)
 @app.route('/api/recipes', methods=['POST'])
 def api_add_recipe():
@@ -209,22 +277,32 @@ def api_add_recipe():
         if not data.get('title'):
             return jsonify({'error': 'Введите название рецепта'}), 400
         
-        if not data.get('ingredients') or len(data['ingredients']) == 0:
+        if not data.get('ingredients'):
             return jsonify({'error': 'Добавьте хотя бы один ингредиент'}), 400
         
-        if not data.get('steps') or len(data['steps']) == 0:
+        if not data.get('steps'):
             return jsonify({'error': 'Добавьте шаги приготовления'}), 400
         
-        if not data.get('cooking_time') or data['cooking_time'] <= 0:
-            return jsonify({'error': 'Введите корректное время приготовления'}), 400
+        # ПРАВИЛЬНАЯ валидация cooking_time
+        cooking_time = data.get('cooking_time')
+        if not cooking_time:
+            return jsonify({'error': 'Введите время приготовления'}), 400
         
-        # Создание рецепта
+        try:
+            # Преобразуем в число
+            cooking_time_int = int(cooking_time)
+            if cooking_time_int <= 0:
+                return jsonify({'error': 'Введите корректное время приготовления (больше 0)'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Время приготовления должно быть числом'}), 400
+        
+        # Создание рецепта - ПРОСТОЙ ТЕКСТ!
         recipe = Recipe(
             title=data['title'].strip(),
             description=data.get('description', '').strip(),
-            ingredients=json.dumps(data['ingredients']),
-            steps=json.dumps(data['steps']),
-            cooking_time=int(data['cooking_time']),
+            ingredients=data['ingredients'].strip(),  # ← ТЕКСТ
+            steps=data['steps'].strip(),  # ← ТЕКСТ
+            cooking_time=cooking_time_int,  # ← УЖЕ ЧИСЛО
             difficulty=data.get('difficulty', 'Средний'),
             category=data.get('category', 'Основное'),
             image_url=data.get('image_url', '/static/img/default.jpg'),
@@ -260,10 +338,24 @@ def api_update_recipe(recipe_id):
             recipe.description = data['description'].strip()
         
         if 'ingredients' in data:
-            recipe.ingredients = json.dumps(data['ingredients'])
+            # Обработка ингредиентов (принимаем строку или список)
+            ingredients_data = data['ingredients']
+            if isinstance(ingredients_data, list):
+                # Список: объединяем в строку
+                recipe.ingredients = '\n'.join([str(item).strip() for item in ingredients_data])
+            else:
+                # Строка: используем как есть
+                recipe.ingredients = ingredients_data.strip()
         
         if 'steps' in data:
-            recipe.steps = json.dumps(data['steps'])
+            # Обработка шагов (принимаем строку или список)
+            steps_data = data['steps']
+            if isinstance(steps_data, list):
+                # Список: объединяем в строку
+                recipe.steps = '\n'.join([str(item).strip() for item in steps_data])
+            else:
+                # Строка: используем как есть
+                recipe.steps = steps_data.strip()
         
         if 'cooking_time' in data:
             recipe.cooking_time = int(data['cooking_time'])
@@ -307,58 +399,57 @@ def api_delete_recipe(recipe_id):
 
 @app.route('/api/recipes/search')
 def search_recipes():
-    """Поиск рецептов (совместимость с main.js)"""
+    """Поиск рецептов (совметимость с main.js)"""
     return perform_search()
 
 @app.route('/api/search')
 def perform_search():
     from sqlalchemy import or_
     
-    query = request.args.get('q', '')
-    ingredients = request.args.get('ingredients', '')
+    query = request.args.get('q', '').strip()
+    ingredients = request.args.get('ingredients', '').strip()
     mode = request.args.get('mode', 'any')
-    category = request.args.get('category', '')
-    difficulty = request.args.get('difficulty', '')
-    time = request.args.get('time', '')
+    category = request.args.get('category', '').strip()
+    difficulty = request.args.get('difficulty', '').strip()
+    time = request.args.get('time', '').strip()
     
     recipes_query = Recipe.query
-    
-    # Если все параметры пустые - возвращаем все рецепты
-    if not any([query, ingredients, category, difficulty, time]):
-        recipes = recipes_query.order_by(Recipe.created_at.desc()).all()
-        return jsonify({
-            'recipes': [r.to_dict() for r in recipes],
-            'count': len(recipes)
-        })
     
     # Поиск по названию и описанию
     if query:
         recipes_query = recipes_query.filter(
-            Recipe.title.ilike(f'%{query}%') | 
-            Recipe.description.ilike(f'%{query}%')
+            or_(
+                Recipe.title.ilike(f'%{query}%'),
+                Recipe.description.ilike(f'%{query}%')
+            )
         )
     
     # Поиск по ингредиентам
     if ingredients:
-        ingredients_list = [i.strip().lower() for i in ingredients.split(',') if i.strip()]
+        ingredients_list = [ing.strip().lower() for ing in ingredients.split(',') if ing.strip()]
         
         if ingredients_list:
             if mode == 'all':
                 # Все ингредиенты должны быть в рецепте
                 for ing in ingredients_list:
-                    recipes_query = recipes_query.filter(Recipe.ingredients.ilike(f'%{ing}%'))
+                    recipes_query = recipes_query.filter(
+                        Recipe.ingredients.ilike(f'%{ing}%')
+                    )
             else:
                 # Любой из ингредиентов должен быть в рецепте
-                conditions = [Recipe.ingredients.ilike(f'%{ing}%') for ing in ingredients_list]
-                recipes_query = recipes_query.filter(or_(*conditions))
+                conditions = []
+                for ing in ingredients_list:
+                    conditions.append(Recipe.ingredients.ilike(f'%{ing}%'))
+                if conditions:
+                    recipes_query = recipes_query.filter(or_(*conditions))
     
     # Фильтр по категории
     if category:
-        recipes_query = recipes_query.filter_by(category=category)
+        recipes_query = recipes_query.filter(Recipe.category == category)
     
     # Фильтр по сложности
     if difficulty:
-        recipes_query = recipes_query.filter_by(difficulty=difficulty)
+        recipes_query = recipes_query.filter(Recipe.difficulty == difficulty)
     
     # Фильтр по времени
     if time:
@@ -495,11 +586,11 @@ if __name__ == '__main__':
     print("Данные для входа:")
     print("👑 Администратор: admin / Admin123!")
     print("\nСсылки:")
-    print("🌐 Главная страница: http://localhost:5000")
-    print("👑 Админ-панель: http://localhost:5000/admin")
-    print("🔍 Поиск рецептов: http://localhost:5000/search")
-    print("🐛 Отладка рецептов: http://localhost:5000/debug/recipes")
+    print("🌐 Главная страница: http://localhost:5001")  # Изменили
+    print("👑 Админ-панель: http://localhost:5001/admin")
+    print("🔍 Поиск рецептов: http://localhost:5001/search")
+    print("🐛 Отладка рецептов: http://localhost:5001/debug/recipes")
     print("=" * 50)
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)  # Изменили порт здесь
     

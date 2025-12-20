@@ -3,6 +3,21 @@
 {% block title %}Редактировать рецепт - Рецепты Полины{% endblock %}
 
 {% block content %}
+{% set ingredients_list = recipe.ingredients if recipe.ingredients else [] %}
+{% set steps_list = recipe.steps if recipe.steps else [] %}
+
+{# Преобразуем список в текст #}
+{% if ingredients_list is string %}
+    {% set ingredients_text = ingredients_list %}
+{% else %}
+    {% set ingredients_text = ingredients_list|join('\n') %}
+{% endif %}
+
+{% if steps_list is string %}
+    {% set steps_text = steps_list %}
+{% else %}
+    {% set steps_text = steps_list|join('\n') %}
+{% endif %}
 <div class="edit-container">
     <div class="edit-header">
         <h1><i class="fas fa-edit"></i> Редактировать рецепт</h1>
@@ -58,16 +73,16 @@
         
         <div class="form-section">
             <label><i class="fas fa-carrot"></i> Ингредиенты *</label>
-            <p class="form-help">Каждый ингредиент с новой строки</p>
+            <p class="form-help">Каждый ингредиент с новой строки или через запятую</p>
             <textarea id="ingredients" name="ingredients" required 
-                      class="form-textarea" rows="6">{{ recipe.ingredients|replace('[', '')|replace(']', '')|replace('"', '')|replace(', ', '\n') }}</textarea>
+                    class="form-textarea" rows="6">{{ ingredients_text }}</textarea>
         </div>
-        
+
         <div class="form-section">
             <label><i class="fas fa-list-ol"></i> Шаги приготовления *</label>
-            <p class="form-help">Каждый шаг с новой строки</p>
+            <p class="form-content">Каждый шаг с новой строки</p>
             <textarea id="steps" name="steps" required 
-                      class="form-textarea" rows="6">{{ recipe.steps|replace('[', '')|replace(']', '')|replace('"', '')|replace(', ', '\n') }}</textarea>
+                    class="form-textarea" rows="6">{{ steps_text }}</textarea>
         </div>
         
         <div class="form-section">

@@ -77,35 +77,42 @@
 
 {% block scripts %}
 <script>
-function viewRecipe(id) {
-    // Можно сделать модальное окно или перенаправление
-    alert('Подробная страница рецепта в разработке. ID рецепта: ' + id);
-    
-    // Или показать подробности
-    // fetch(`/api/recipes/${id}`)
-    //   .then(response => response.json())
-    //   .then(data => showRecipeModal(data));
+async function viewRecipe(id) {
+    try {
+        const response = await fetch(`/api/recipes/${id}`);
+        if (!response.ok) {
+            throw new Error('Рецепт не найден');
+        }
+        
+        const recipe = await response.json();
+        
+        // Формируем содержимое для модального окна
+        const ingredients = Array.isArray(recipe.ingredients) ? 
+            recipe.ingredients.join('\n• ') : recipe.ingredients || 'Не указаны';
+        
+        const steps = Array.isArray(recipe.steps) ? 
+            recipe.steps.join('\n\n') : recipe.steps || 'Не указаны';
+        
+        // Показываем подробности рецепта
+        alert(
+            `🍽️ ${recipe.title}\n\n` +
+            `⏰ Время: ${recipe.cooking_time || 0} минут\n` +
+            `🔥 Сложность: ${recipe.difficulty || 'Не указано'}\n` +
+            `🏷️ Категория: ${recipe.category || 'Без категории'}\n\n` +
+            `📝 Ингредиенты:\n• ${ingredients}\n\n` +
+            `👩‍🍳 Шаги приготовления:\n${steps}`
+        );
+        
+    } catch (error) {
+        console.error('Error loading recipe:', error);
+        alert('Не удалось загрузить рецепт. Пожалуйста, попробуйте позже.');
+    }
 }
 
-// Если нужна динамическая загрузка
-// document.addEventListener('DOMContentLoaded', function() {
-//     // Загружаем рецепты если их нет на странице
-//     if (document.querySelectorAll('.recipe-card').length === 0) {
-//         loadRecipes();
-//     }
-// });
-
-// async function loadRecipes() {
-//     try {
-//         const response = await fetch('/api/recipes');
-//         const data = await response.json();
-//         if (data.recipes && data.recipes.length > 0) {
-//             renderRecipes(data.recipes);
-//         }
-//     } catch (error) {
-//         console.error('Error loading recipes:', error);
-//     }
-// }
+// Альтернатива: открытие в новой странице
+function viewRecipePage(id) {
+    window.open(`/recipe/${id}`, '_blank');
+}
 </script>
 
 <style>
