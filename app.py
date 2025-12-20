@@ -34,8 +34,8 @@ class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    ingredients = db.Column(db.Text, nullable=False)  # Простой текст, каждая строка = ингредиент
-    steps = db.Column(db.Text, nullable=False)       # Простой текст, каждая строка = шаг
+    ingredients = db.Column(db.Text, nullable=False)
+    steps = db.Column(db.Text, nullable=False)
     cooking_time = db.Column(db.Integer)
     difficulty = db.Column(db.String(20))
     category = db.Column(db.String(50))
@@ -63,7 +63,6 @@ class Recipe(db.Model):
         if not self.ingredients:
             return []
         
-        # Если это JSON строка (старый формат)
         if self.ingredients.strip().startswith('['):
             try:
                 ingredients_data = json.loads(self.ingredients)
@@ -72,7 +71,6 @@ class Recipe(db.Model):
             except:
                 pass
         
-        # Разбиваем по строкам, удаляем пустые
         return [line.strip() for line in self.ingredients.split('\n') if line.strip()]
     
     def get_steps_list(self):
@@ -80,7 +78,6 @@ class Recipe(db.Model):
         if not self.steps:
             return []
         
-        # Если это JSON строка (старый формат)
         if self.steps.strip().startswith('['):
             try:
                 steps_data = json.loads(self.steps)
@@ -89,7 +86,6 @@ class Recipe(db.Model):
             except:
                 pass
         
-        # Разбиваем по строкам, удаляем пустые
         return [line.strip() for line in self.steps.split('\n') if line.strip()]
     
     def get_ingredients_text(self):
@@ -105,7 +101,6 @@ def init_database():
     with app.app_context():
         db.create_all()
         
-        # Создаем администратора
         admin = User.query.filter_by(username='admin').first()
         if not admin:
             admin = User(username='admin', email='admin@example.com', is_admin=True)
@@ -114,7 +109,6 @@ def init_database():
             db.session.commit()
             print("✅ Администратор создан: admin / Admin123!")
         
-        # Добавляем тестовые рецепты, если их нет
         if Recipe.query.count() == 0:
             sample_recipes = [
                 {
@@ -217,53 +211,11 @@ def get_all_recipes():
     return jsonify({'recipes': [r.to_dict() for r in recipes]})
 
 # Получить один рецепт
-@app.route('/api/recipes/<int:recipe_id>', methods=['PUT'])
-def api_update_recipe(recipe_id):
-    if not session.get('is_admin'):
-        return jsonify({'error': 'Требуются права администратора'}), 403
-    
+@app.route('/api/recipes/<int:recipe_id>')
+def get_recipe(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
-    
-    try:
-        data = request.json
-        
-        if 'title' in data:
-            recipe.title = data['title'].strip()
-        
-        if 'description' in data:
-            recipe.description = data['description'].strip()
-        
-        if 'ingredients' in data:
-            recipe.ingredients = data['ingredients'].strip()  # ← ТЕКСТ
-        
-        if 'steps' in data:
-            recipe.steps = data['steps'].strip()  # ← ТЕКСТ
-        
-        if 'cooking_time' in data:
-            try:
-                recipe.cooking_time = int(data['cooking_time'])
-            except (ValueError, TypeError):
-                return jsonify({'error': 'Время приготовления должно быть числом'}), 400
-        
-        if 'difficulty' in data:
-            recipe.difficulty = data['difficulty']
-        
-        if 'category' in data:
-            recipe.category = data['category']
-        
-        if 'image_url' in data:
-            recipe.image_url = data['image_url']
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Рецепт успешно обновлен!',
-            'recipe': recipe.to_dict()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
+    return jsonify({'recipe': recipe.to_dict()})
+
 # Добавить рецепт (только админ)
 @app.route('/api/recipes', methods=['POST'])
 def api_add_recipe():
@@ -273,7 +225,6 @@ def api_add_recipe():
     try:
         data = request.json
         
-        # Валидация
         if not data.get('title'):
             return jsonify({'error': 'Введите название рецепта'}), 400
         
@@ -283,26 +234,24 @@ def api_add_recipe():
         if not data.get('steps'):
             return jsonify({'error': 'Добавьте шаги приготовления'}), 400
         
-        # ПРАВИЛЬНАЯ валидация cooking_time
         cooking_time = data.get('cooking_time')
         if not cooking_time:
             return jsonify({'error': 'Введите время приготовления'}), 400
         
         try:
-            # Преобразуем в число
             cooking_time_int = int(cooking_time)
             if cooking_time_int <= 0:
                 return jsonify({'error': 'Введите корректное время приготовления (больше 0)'}), 400
         except (ValueError, TypeError):
             return jsonify({'error': 'Время приготовления должно быть числом'}), 400
         
-        # Создание рецепта - ПРОСТОЙ ТЕКСТ!
+        # Создание рецепта
         recipe = Recipe(
             title=data['title'].strip(),
             description=data.get('description', '').strip(),
-            ingredients=data['ingredients'].strip(),  # ← ТЕКСТ
-            steps=data['steps'].strip(),  # ← ТЕКСТ
-            cooking_time=cooking_time_int,  # ← УЖЕ ЧИСЛО
+            ingredients=data['ingredients'].strip(),
+            steps=data['steps'].strip(),
+            cooking_time=cooking_time_int,
             difficulty=data.get('difficulty', 'Средний'),
             category=data.get('category', 'Основное'),
             image_url=data.get('image_url', '/static/img/default.jpg'),
@@ -338,27 +287,24 @@ def api_update_recipe(recipe_id):
             recipe.description = data['description'].strip()
         
         if 'ingredients' in data:
-            # Обработка ингредиентов (принимаем строку или список)
             ingredients_data = data['ingredients']
             if isinstance(ingredients_data, list):
-                # Список: объединяем в строку
                 recipe.ingredients = '\n'.join([str(item).strip() for item in ingredients_data])
             else:
-                # Строка: используем как есть
                 recipe.ingredients = ingredients_data.strip()
         
         if 'steps' in data:
-            # Обработка шагов (принимаем строку или список)
             steps_data = data['steps']
             if isinstance(steps_data, list):
-                # Список: объединяем в строку
                 recipe.steps = '\n'.join([str(item).strip() for item in steps_data])
             else:
-                # Строка: используем как есть
                 recipe.steps = steps_data.strip()
         
         if 'cooking_time' in data:
-            recipe.cooking_time = int(data['cooking_time'])
+            try:
+                recipe.cooking_time = int(data['cooking_time'])
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Время приготовления должно быть числом'}), 400
         
         if 'difficulty' in data:
             recipe.difficulty = data['difficulty']
@@ -430,13 +376,11 @@ def perform_search():
         
         if ingredients_list:
             if mode == 'all':
-                # Все ингредиенты должны быть в рецепте
                 for ing in ingredients_list:
                     recipes_query = recipes_query.filter(
                         Recipe.ingredients.ilike(f'%{ing}%')
                     )
             else:
-                # Любой из ингредиентов должен быть в рецепте
                 conditions = []
                 for ing in ingredients_list:
                     conditions.append(Recipe.ingredients.ilike(f'%{ing}%'))
@@ -475,7 +419,6 @@ def api_register():
     if not data.get('username') or not data.get('password'):
         return jsonify({'error': 'Заполните все поля'}), 400
     
-    # Проверка на русские буквы
     if re.search('[а-яА-Я]', data['username']):
         return jsonify({'error': 'Логин должен содержать только латинские буквы'}), 400
     
@@ -530,10 +473,7 @@ def api_delete_account():
     if user.is_admin:
         return jsonify({'error': 'Нельзя удалить администратора'}), 403
     
-    # Удаляем рецепты пользователя
     Recipe.query.filter_by(user_id=user.id).delete()
-    
-    # Удаляем пользователя
     db.session.delete(user)
     db.session.commit()
     
@@ -553,7 +493,6 @@ def inject_user():
 
 @app.before_request
 def before_request():
-    # Инициализируем БД если нужно
     if not hasattr(app, 'db_initialized'):
         init_database()
         app.db_initialized = True
@@ -586,11 +525,11 @@ if __name__ == '__main__':
     print("Данные для входа:")
     print("👑 Администратор: admin / Admin123!")
     print("\nСсылки:")
-    print("🌐 Главная страница: http://localhost:5001")  # Изменили
+    print("🌐 Главная страница: http://localhost:5001")
     print("👑 Админ-панель: http://localhost:5001/admin")
     print("🔍 Поиск рецептов: http://localhost:5001/search")
     print("🐛 Отладка рецептов: http://localhost:5001/debug/recipes")
     print("=" * 50)
     
-    app.run(debug=True, host='0.0.0.0', port=5001)  # Изменили порт здесь
+    app.run(debug=True, host='0.0.0.0', port=5001)
     
