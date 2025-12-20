@@ -1,78 +1,410 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-from flask_cors import CORS
-from config import Config
-from database import init_db, db
-from models import User, Recipe
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 import re
+import os
 import json
 
 app = Flask(__name__)
-app.config.from_object(Config)
-CORS(app)
 
-# Инициализация БД
-init_db(app)
+# Конфигурация
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-me'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///recipes.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ========== Валидация ==========
-def validate_username(username):
-    """Проверка логина: только латинские буквы, цифры и _-."""
-    pattern = r'^[a-zA-Z0-9_-]{3,50}$'
-    return bool(re.match(pattern, username))
+db = SQLAlchemy(app)
 
-def validate_password(password):
-    """Проверка пароля: минимум 8 символов, буквы, цифры и знаки препинания."""
-    if len(password) < 8:
-        return False
-    # Проверка на русские буквы
-    if re.search('[а-яА-Я]', password):
-        return False
-    # Должны быть буквы и цифры
-    if not re.search('[a-zA-Z]', password) or not re.search('[0-9]', password):
-        return False
-    return True
+# Модели
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
-def validate_email(email):
-    """Простая валидация email."""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
+class Recipe(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    ingredients = db.Column(db.Text, nullable=False)
+    steps = db.Column(db.Text, nullable=False)
+    cooking_time = db.Column(db.Integer)
+    difficulty = db.Column(db.String(20))
+    category = db.Column(db.String(50))
+    image_url = db.Column(db.String(300), default='/static/img/default.jpg')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    def to_dict(self):
+        # Безопасная обработка JSON для ingredients
+        try:
+            ingredients_data = json.loads(self.ingredients) if self.ingredients else []
+        except json.JSONDecodeError:
+            # Если не валидный JSON, возвращаем как простой список
+            if self.ingredients:
+                ingredients_data = [self.ingredients]
+            else:
+                ingredients_data = []
+        
+        # Безопасная обработка JSON для steps
+        try:
+            steps_data = json.loads(self.steps) if self.steps else []
+        except json.JSONDecodeError:
+            # Если не валидный JSON, возвращаем как простой список
+            if self.steps:
+                steps_data = [self.steps]
+            else:
+                steps_data = []
+        
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'ingredients': ingredients_data,
+            'steps': steps_data,
+            'cooking_time': self.cooking_time,
+            'difficulty': self.difficulty,
+            'category': self.category,
+            'image_url': self.image_url,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else ''
+        }
 
-# ========== API Роуты ==========
+# Инициализация базы данных с тестовыми данными
+def init_database():
+    with app.app_context():
+        db.create_all()
+        
+        # Создаем администратора
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            admin = User(username='admin', email='admin@example.com', is_admin=True)
+            admin.set_password('Admin123!')
+            db.session.add(admin)
+            db.session.commit()
+            print("✅ Администратор создан: admin / Admin123!")
+        
+        # Добавляем тестовые рецепты, если их нет
+        if Recipe.query.count() == 0:
+            sample_recipes = [
+                {
+                    'title': 'Панкейки с кленовым сиропом',
+                    'description': 'Пушистые американские блинчики на завтрак',
+                    'ingredients': json.dumps(["200г муки", "300мл молока", "2 яйца", "2 ст.л. сахара", "2 ч.л. разрыхлителя", "щепотка соли"]),
+                    'steps': json.dumps(["Смешать сухие ингредиенты", "Добавить яйца и молоко, перемешать", "Жарить на сковороде по 2-3 минуты с каждой стороны", "Подавать с кленовым сиропом"]),
+                    'cooking_time': 20,
+                    'difficulty': 'Легкий',
+                    'category': 'Завтрак'
+                },
+                {
+                    'title': 'Салат Цезарь',
+                    'description': 'Классический салат с курицей и сухариками',
+                    'ingredients': json.dumps(["200г куриного филе", "100г пармезана", "1 пучок салата романо", "100г сухариков", "2 яйца", "соус цезарь"]),
+                    'steps': json.dumps(["Обжарить куриное филе", "Отварить яйца", "Нарезать салат", "Смешать все ингредиенты", "Заправить соусом"]),
+                    'cooking_time': 25,
+                    'difficulty': 'Легкий',
+                    'category': 'Обед'
+                }
+            ]
+            
+            for recipe_data in sample_recipes:
+                recipe = Recipe(
+                    title=recipe_data['title'],
+                    description=recipe_data['description'],
+                    ingredients=recipe_data['ingredients'],
+                    steps=recipe_data['steps'],
+                    cooking_time=recipe_data['cooking_time'],
+                    difficulty=recipe_data['difficulty'],
+                    category=recipe_data['category'],
+                    user_id=admin.id
+                )
+                db.session.add(recipe)
+            
+            db.session.commit()
+            print(f"✅ Добавлено {len(sample_recipes)} тестовых рецептов")
+
+# ========== РОУТЫ ДЛЯ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ ==========
+
+@app.route('/')
+def index():
+    recipes = Recipe.query.order_by(Recipe.created_at.desc()).limit(12).all()
+    return render_template('index.html', recipes=recipes)
+
+@app.route('/search')
+def search_page():
+    return render_template('search.html')
+
+@app.route('/login')
+def login_page():
+    return render_template('login.html')
+
+@app.route('/register')
+def register_page():
+    return render_template('register.html')
+
+# ========== АДМИН-ПАНЕЛЬ ==========
+
+@app.route('/admin')
+def admin_page():
+    if not session.get('is_admin'):
+        flash('Требуются права администратора', 'error')
+        return redirect(url_for('login_page'))
+    
+    recipes = Recipe.query.order_by(Recipe.created_at.desc()).all()
+    users = User.query.all()
+    
+    return render_template('admin.html', 
+                         recipes=recipes, 
+                         users=users,
+                         recipe_count=len(recipes),
+                         user_count=len(users))
+
+@app.route('/admin/add-recipe')
+def add_recipe_page():
+    if not session.get('is_admin'):
+        flash('Требуются права администратора', 'error')
+        return redirect(url_for('login_page'))
+    return render_template('add_recipe.html')
+
+@app.route('/admin/edit-recipe/<int:recipe_id>')
+def edit_recipe_page(recipe_id):
+    if not session.get('is_admin'):
+        flash('Требуются права администратора', 'error')
+        return redirect(url_for('login_page'))
+    
+    recipe = Recipe.query.get_or_404(recipe_id)
+    return render_template('edit_recipe.html', recipe=recipe)
+
+# ========== API ДЛЯ УПРАВЛЕНИЯ РЕЦЕПТАМИ ==========
+
+# Получить все рецепты
+@app.route('/api/recipes')
+def get_all_recipes():
+    recipes = Recipe.query.order_by(Recipe.created_at.desc()).all()
+    return jsonify({'recipes': [r.to_dict() for r in recipes]})
+
+# Получить один рецепт
+@app.route('/api/recipes/<int:recipe_id>')
+def get_recipe(recipe_id):
+    recipe = Recipe.query.get_or_404(recipe_id)
+    return jsonify(recipe.to_dict())
+
+# Добавить рецепт (только админ)
+@app.route('/api/recipes', methods=['POST'])
+def api_add_recipe():
+    if not session.get('is_admin'):
+        return jsonify({'error': 'Требуются права администратора'}), 403
+    
+    try:
+        data = request.json
+        
+        # Валидация
+        if not data.get('title'):
+            return jsonify({'error': 'Введите название рецепта'}), 400
+        
+        if not data.get('ingredients') or len(data['ingredients']) == 0:
+            return jsonify({'error': 'Добавьте хотя бы один ингредиент'}), 400
+        
+        if not data.get('steps') or len(data['steps']) == 0:
+            return jsonify({'error': 'Добавьте шаги приготовления'}), 400
+        
+        if not data.get('cooking_time') or data['cooking_time'] <= 0:
+            return jsonify({'error': 'Введите корректное время приготовления'}), 400
+        
+        # Создание рецепта
+        recipe = Recipe(
+            title=data['title'].strip(),
+            description=data.get('description', '').strip(),
+            ingredients=json.dumps(data['ingredients']),
+            steps=json.dumps(data['steps']),
+            cooking_time=int(data['cooking_time']),
+            difficulty=data.get('difficulty', 'Средний'),
+            category=data.get('category', 'Основное'),
+            image_url=data.get('image_url', '/static/img/default.jpg'),
+            user_id=session['user_id']
+        )
+        
+        db.session.add(recipe)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Рецепт успешно добавлен!',
+            'recipe': recipe.to_dict()
+        }), 201
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Обновить рецепт (только админ)
+@app.route('/api/recipes/<int:recipe_id>', methods=['PUT'])
+def api_update_recipe(recipe_id):
+    if not session.get('is_admin'):
+        return jsonify({'error': 'Требуются права администратора'}), 403
+    
+    recipe = Recipe.query.get_or_404(recipe_id)
+    
+    try:
+        data = request.json
+        
+        if 'title' in data:
+            recipe.title = data['title'].strip()
+        
+        if 'description' in data:
+            recipe.description = data['description'].strip()
+        
+        if 'ingredients' in data:
+            recipe.ingredients = json.dumps(data['ingredients'])
+        
+        if 'steps' in data:
+            recipe.steps = json.dumps(data['steps'])
+        
+        if 'cooking_time' in data:
+            recipe.cooking_time = int(data['cooking_time'])
+        
+        if 'difficulty' in data:
+            recipe.difficulty = data['difficulty']
+        
+        if 'category' in data:
+            recipe.category = data['category']
+        
+        if 'image_url' in data:
+            recipe.image_url = data['image_url']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Рецепт успешно обновлен!',
+            'recipe': recipe.to_dict()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Удалить рецепт (только админ)
+@app.route('/api/recipes/<int:recipe_id>', methods=['DELETE'])
+def api_delete_recipe(recipe_id):
+    if not session.get('is_admin'):
+        return jsonify({'error': 'Требуются права администратора'}), 403
+    
+    recipe = Recipe.query.get_or_404(recipe_id)
+    title = recipe.title
+    
+    db.session.delete(recipe)
+    db.session.commit()
+    
+    return jsonify({
+        'message': f'Рецепт "{title}" успешно удален!'
+    })
+
+# ========== ПОИСК РЕЦЕПТОВ ==========
+
+@app.route('/api/recipes/search')
+def search_recipes():
+    """Поиск рецептов (совместимость с main.js)"""
+    return perform_search()
+
+@app.route('/api/search')
+def perform_search():
+    from sqlalchemy import or_
+    
+    query = request.args.get('q', '')
+    ingredients = request.args.get('ingredients', '')
+    mode = request.args.get('mode', 'any')
+    category = request.args.get('category', '')
+    difficulty = request.args.get('difficulty', '')
+    time = request.args.get('time', '')
+    
+    recipes_query = Recipe.query
+    
+    # Если все параметры пустые - возвращаем все рецепты
+    if not any([query, ingredients, category, difficulty, time]):
+        recipes = recipes_query.order_by(Recipe.created_at.desc()).all()
+        return jsonify({
+            'recipes': [r.to_dict() for r in recipes],
+            'count': len(recipes)
+        })
+    
+    # Поиск по названию и описанию
+    if query:
+        recipes_query = recipes_query.filter(
+            Recipe.title.ilike(f'%{query}%') | 
+            Recipe.description.ilike(f'%{query}%')
+        )
+    
+    # Поиск по ингредиентам
+    if ingredients:
+        ingredients_list = [i.strip().lower() for i in ingredients.split(',') if i.strip()]
+        
+        if ingredients_list:
+            if mode == 'all':
+                # Все ингредиенты должны быть в рецепте
+                for ing in ingredients_list:
+                    recipes_query = recipes_query.filter(Recipe.ingredients.ilike(f'%{ing}%'))
+            else:
+                # Любой из ингредиентов должен быть в рецепте
+                conditions = [Recipe.ingredients.ilike(f'%{ing}%') for ing in ingredients_list]
+                recipes_query = recipes_query.filter(or_(*conditions))
+    
+    # Фильтр по категории
+    if category:
+        recipes_query = recipes_query.filter_by(category=category)
+    
+    # Фильтр по сложности
+    if difficulty:
+        recipes_query = recipes_query.filter_by(difficulty=difficulty)
+    
+    # Фильтр по времени
+    if time:
+        try:
+            max_time = int(time)
+            recipes_query = recipes_query.filter(Recipe.cooking_time <= max_time)
+        except ValueError:
+            pass
+    
+    recipes = recipes_query.order_by(Recipe.created_at.desc()).all()
+    
+    return jsonify({
+        'recipes': [r.to_dict() for r in recipes],
+        'count': len(recipes)
+    })
+
+# ========== API ДЛЯ АУТЕНТИФИКАЦИИ ==========
+
 @app.route('/api/register', methods=['POST'])
 def api_register():
-    data = request.get_json()
+    data = request.json
     
-    # Валидация
-    if not all(k in data for k in ['username', 'email', 'password']):
-        return jsonify({'error': 'Не все поля заполнены'}), 400
+    if not data.get('username') or not data.get('password'):
+        return jsonify({'error': 'Заполните все поля'}), 400
     
-    if not validate_username(data['username']):
-        return jsonify({'error': 'Логин должен содержать только латинские буквы, цифры, _ или -'}), 400
+    # Проверка на русские буквы
+    if re.search('[а-яА-Я]', data['username']):
+        return jsonify({'error': 'Логин должен содержать только латинские буквы'}), 400
     
-    if not validate_email(data['email']):
-        return jsonify({'error': 'Некорректный email'}), 400
-    
-    if not validate_password(data['password']):
-        return jsonify({'error': 'Пароль должен быть минимум 8 символов, содержать буквы и цифры (без русских букв)'}), 400
-    
-    # Проверка существования пользователя
     if User.query.filter_by(username=data['username']).first():
         return jsonify({'error': 'Пользователь уже существует'}), 400
     
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': 'Email уже используется'}), 400
-    
-    # Создание пользователя
-    user = User(username=data['username'], email=data['email'])
+    user = User(
+        username=data['username'],
+        email=data.get('email', f"{data['username']}@example.com")
+    )
     user.set_password(data['password'])
     
     db.session.add(user)
     db.session.commit()
     
-    return jsonify({'message': 'Регистрация успешна'}), 201
+    return jsonify({'message': 'Регистрация успешна!'}), 201
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
-    data = request.get_json()
+    data = request.json
     
     user = User.query.filter_by(username=data.get('username')).first()
     
@@ -80,10 +412,9 @@ def api_login():
         session['user_id'] = user.id
         session['username'] = user.username
         session['is_admin'] = user.is_admin
-        session.permanent = True
         
         return jsonify({
-            'message': 'Вход выполнен',
+            'message': 'Вход выполнен!',
             'user': {
                 'id': user.id,
                 'username': user.username,
@@ -96,142 +427,15 @@ def api_login():
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
     session.clear()
-    return jsonify({'message': 'Выход выполнен'})
-
-@app.route('/api/recipes', methods=['GET'])
-def get_recipes():
-    """Получение рецептов с пагинацией и фильтрацией"""
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 12, type=int)
-    category = request.args.get('category')
-    
-    query = Recipe.query
-    
-    if category:
-        query = query.filter_by(category=category)
-    
-    recipes = query.order_by(Recipe.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-    
-    return jsonify({
-        'recipes': [r.to_dict() for r in recipes.items],
-        'total': recipes.total,
-        'pages': recipes.pages,
-        'current_page': page
-    })
-
-@app.route('/api/recipes/search', methods=['GET'])
-def search_recipes():
-    """Поиск рецептов по названию и ингредиентам"""
-    query = request.args.get('q', '')
-    ingredients = request.args.get('ingredients', '')
-    search_mode = request.args.get('mode', 'any')  # 'any' или 'all'
-    
-    recipes_query = Recipe.query
-    
-    # Поиск по названию
-    if query:
-        recipes_query = recipes_query.filter(
-            Recipe.title.ilike(f'%{query}%')
-        )
-    
-    # Поиск по ингредиентам
-    if ingredients:
-        ingredients_list = [i.strip().lower() for i in ingredients.split(',')]
-        
-        if search_mode == 'all':
-            # Все ингредиенты должны быть в рецепте
-            for ing in ingredients_list:
-                recipes_query = recipes_query.filter(
-                    Recipe.ingredients.ilike(f'%{ing}%')
-                )
-        else:
-            # Хотя бы один ингредиент
-            from sqlalchemy import or_
-            conditions = []
-            for ing in ingredients_list:
-                conditions.append(Recipe.ingredients.ilike(f'%{ing}%'))
-            recipes_query = recipes_query.filter(or_(*conditions))
-    
-    recipes = recipes_query.limit(50).all()
-    return jsonify({'recipes': [r.to_dict() for r in recipes]})
-
-@app.route('/api/recipes', methods=['POST'])
-def add_recipe():
-    """Добавление нового рецепта (только для админа)"""
-    if not session.get('is_admin'):
-        return jsonify({'error': 'Требуются права администратора'}), 403
-    
-    data = request.get_json()
-    
-    # Валидация
-    if not data.get('title') or not data.get('ingredients') or not data.get('steps'):
-        return jsonify({'error': 'Заполните обязательные поля'}), 400
-    
-    if data.get('cooking_time', 0) <= 0:
-        return jsonify({'error': 'Время приготовления должно быть положительным'}), 400
-    
-    recipe = Recipe(
-        title=data['title'],
-        description=data.get('description', ''),
-        ingredients=str(data['ingredients']),
-        steps=str(data['steps']),
-        cooking_time=data['cooking_time'],
-        difficulty=data.get('difficulty', 'Средний'),
-        category=data.get('category', 'Основное'),
-        image_url=data.get('image_url', '/static/img/default.jpg'),
-        user_id=session['user_id']
-    )
-    
-    db.session.add(recipe)
-    db.session.commit()
-    
-    return jsonify({'message': 'Рецепт добавлен', 'id': recipe.id}), 201
-
-@app.route('/api/recipes/<int:recipe_id>', methods=['PUT'])
-def update_recipe(recipe_id):
-    """Обновление рецепта (только для админа)"""
-    if not session.get('is_admin'):
-        return jsonify({'error': 'Требуются права администратора'}), 403
-    
-    recipe = Recipe.query.get_or_404(recipe_id)
-    data = request.get_json()
-    
-    # Обновление полей
-    if 'title' in data:
-        recipe.title = data['title']
-    if 'ingredients' in data:
-        recipe.ingredients = str(data['ingredients'])
-    if 'steps' in data:
-        recipe.steps = str(data['steps'])
-    if 'cooking_time' in data and data['cooking_time'] > 0:
-        recipe.cooking_time = data['cooking_time']
-    
-    db.session.commit()
-    return jsonify({'message': 'Рецепт обновлен'})
-
-@app.route('/api/recipes/<int:recipe_id>', methods=['DELETE'])
-def delete_recipe(recipe_id):
-    """Удаление рецепта (только для админа)"""
-    if not session.get('is_admin'):
-        return jsonify({'error': 'Требуются права администратора'}), 403
-    
-    recipe = Recipe.query.get_or_404(recipe_id)
-    db.session.delete(recipe)
-    db.session.commit()
-    
-    return jsonify({'message': 'Рецепт удален'})
+    return jsonify({'message': 'Выход выполнен!'})
 
 @app.route('/api/user/delete', methods=['POST'])
-def delete_account():
-    """Удаление аккаунта пользователя"""
+def api_delete_account():
     if not session.get('user_id'):
         return jsonify({'error': 'Не авторизован'}), 401
     
     user = User.query.get(session['user_id'])
     
-    # Админа нельзя удалить через этот метод
     if user.is_admin:
         return jsonify({'error': 'Нельзя удалить администратора'}), 403
     
@@ -243,42 +447,12 @@ def delete_account():
     db.session.commit()
     
     session.clear()
-    return jsonify({'message': 'Аккаунт удален'})
+    return jsonify({'message': 'Аккаунт удален!'})
 
-# ========== HTML Роуты ==========
-@app.route('/')
-def index():
-    """Главная страница"""
-    return render_template('index.html')
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
-@app.route('/login')
-def login_page():
-    return render_template('login.html')
-
-@app.route('/register')
-def register_page():
-    return render_template('register.html')
-
-@app.route('/search')
-def search_page():
-    return render_template('search.html')
-
-@app.route('/admin')
-def admin_page():
-    if not session.get('is_admin'):
-        return redirect(url_for('login_page'))
-    return render_template('admin.html')
-
-@app.route('/add-recipe')
-def add_recipe_page():
-    if not session.get('is_admin'):
-        return redirect(url_for('login_page'))
-    return render_template('add_recipe.html')
-
-# ========== Контекст ==========
 @app.context_processor
 def inject_user():
-    """Добавляет пользователя во все шаблоны"""
     user_info = {
         'is_authenticated': 'user_id' in session,
         'username': session.get('username'),
@@ -286,6 +460,46 @@ def inject_user():
     }
     return dict(user=user_info)
 
+@app.before_request
+def before_request():
+    # Инициализируем БД если нужно
+    if not hasattr(app, 'db_initialized'):
+        init_database()
+        app.db_initialized = True
+
+# ========== ДЕБАГ РЕЦЕПТОВ ==========
+
+@app.route('/debug/recipes')
+def debug_recipes():
+    """Страница для отладки - показывает все рецепты в базе"""
+    recipes = Recipe.query.all()
+    result = []
+    for recipe in recipes:
+        result.append({
+            'id': recipe.id,
+            'title': recipe.title,
+            'ingredients_raw': recipe.ingredients[:100] + '...' if recipe.ingredients and len(recipe.ingredients) > 100 else recipe.ingredients,
+            'steps_raw': recipe.steps[:100] + '...' if recipe.steps and len(recipe.steps) > 100 else recipe.steps,
+            'category': recipe.category,
+            'cooking_time': recipe.cooking_time,
+            'difficulty': recipe.difficulty
+        })
+    return jsonify({'recipes': result, 'count': len(result)})
+
+# ========== ЗАПУСК ==========
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    print("=" * 50)
+    print("🍽️  Сайт рецептов Полины")
+    print("=" * 50)
+    print("Данные для входа:")
+    print("👑 Администратор: admin / Admin123!")
+    print("\nСсылки:")
+    print("🌐 Главная страница: http://localhost:5000")
+    print("👑 Админ-панель: http://localhost:5000/admin")
+    print("🔍 Поиск рецептов: http://localhost:5000/search")
+    print("🐛 Отладка рецептов: http://localhost:5000/debug/recipes")
+    print("=" * 50)
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)
     

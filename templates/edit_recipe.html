@@ -3,141 +3,120 @@
 {% block title %}Редактировать рецепт - Рецепты Полины{% endblock %}
 
 {% block content %}
-{% if not user.is_authenticated or not user.is_admin %}
-<div class="access-denied">
-    <i class="fas fa-lock" style="font-size: 5rem; color: #ff6b6b;"></i>
-    <h2>Доступ запрещен</h2>
-    <p>Требуются права администратора</p>
-    <a href="{{ url_for('login_page') }}" class="btn-login">
-        <i class="fas fa-sign-in-alt"></i> Войти как администратор
-    </a>
-</div>
-{% else %}
-<div class="recipe-form-page">
-    <div class="form-header">
-        <h2><i class="fas fa-edit"></i> Редактировать рецепт</h2>
-        <p>Внесите изменения в рецепт и сохраните их</p>
+<div class="edit-container">
+    <div class="edit-header">
+        <h1><i class="fas fa-edit"></i> Редактировать рецепт</h1>
+        <p>Внесите изменения в рецепт "{{ recipe.title }}"</p>
     </div>
     
-    <div class="loading" id="loading" style="text-align: center; padding: 60px;">
-        <i class="fas fa-spinner fa-spin" style="font-size: 3rem; color: var(--primary);"></i>
-        <p>Загрузка рецепта...</p>
-    </div>
-    
-    <form id="edit-recipe-form" class="recipe-form" style="display: none;">
-        <!-- Такая же форма как в add_recipe.html, но с данными рецепта -->
-        <!-- Для краткости, форма такая же как в add_recipe.html -->
-        <!-- В реальном проекте нужно подставить данные рецепта -->
+    <form id="edit-recipe-form" class="recipe-form">
+        <input type="hidden" id="recipe_id" value="{{ recipe.id }}">
+        
+        <div class="form-section">
+            <div class="form-group">
+                <label for="title"><i class="fas fa-heading"></i> Название рецепта *</label>
+                <input type="text" id="title" name="title" required 
+                       value="{{ recipe.title }}" class="form-input">
+            </div>
+            
+            <div class="form-group">
+                <label for="description"><i class="fas fa-align-left"></i> Описание</label>
+                <textarea id="description" name="description" 
+                          class="form-textarea" rows="3">{{ recipe.description or '' }}</textarea>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="cooking_time"><i class="fas fa-clock"></i> Время (мин) *</label>
+                <input type="number" id="cooking_time" name="cooking_time" required 
+                       min="1" max="1000" value="{{ recipe.cooking_time }}" class="form-input">
+            </div>
+            
+            <div class="form-group">
+                <label for="difficulty"><i class="fas fa-fire"></i> Сложность *</label>
+                <select id="difficulty" name="difficulty" required class="form-select">
+                    <option value="Легкий" {% if recipe.difficulty == 'Легкий' %}selected{% endif %}>Легкий</option>
+                    <option value="Средний" {% if recipe.difficulty == 'Средний' %}selected{% endif %}>Средний</option>
+                    <option value="Сложный" {% if recipe.difficulty == 'Сложный' %}selected{% endif %}>Сложный</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="category"><i class="fas fa-tag"></i> Категория *</label>
+                <select id="category" name="category" required class="form-select">
+                    <option value="Завтрак" {% if recipe.category == 'Завтрак' %}selected{% endif %}>Завтрак</option>
+                    <option value="Обед" {% if recipe.category == 'Обед' %}selected{% endif %}>Обед</option>
+                    <option value="Ужин" {% if recipe.category == 'Ужин' %}selected{% endif %}>Ужин</option>
+                    <option value="Десерт" {% if recipe.category == 'Десерт' %}selected{% endif %}>Десерт</option>
+                    <option value="Выпечка" {% if recipe.category == 'Выпечка' %}selected{% endif %}>Выпечка</option>
+                    <option value="Напитки" {% if recipe.category == 'Напитки' %}selected{% endif %}>Напитки</option>
+                    <option value="Диетическое" {% if recipe.category == 'Диетическое' %}selected{% endif %}>Диетическое</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <label><i class="fas fa-carrot"></i> Ингредиенты *</label>
+            <p class="form-help">Каждый ингредиент с новой строки</p>
+            <textarea id="ingredients" name="ingredients" required 
+                      class="form-textarea" rows="6">{{ recipe.ingredients|replace('[', '')|replace(']', '')|replace('"', '')|replace(', ', '\n') }}</textarea>
+        </div>
+        
+        <div class="form-section">
+            <label><i class="fas fa-list-ol"></i> Шаги приготовления *</label>
+            <p class="form-help">Каждый шаг с новой строки</p>
+            <textarea id="steps" name="steps" required 
+                      class="form-textarea" rows="6">{{ recipe.steps|replace('[', '')|replace(']', '')|replace('"', '')|replace(', ', '\n') }}</textarea>
+        </div>
+        
+        <div class="form-section">
+            <label for="image_url"><i class="fas fa-image"></i> URL изображения</label>
+            <input type="url" id="image_url" name="image_url" 
+                   value="{{ recipe.image_url or '' }}" 
+                   class="form-input">
+            <p class="form-help">Оставьте пустым для использования изображения по умолчанию</p>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-save"></i> Сохранить изменения
+            </button>
+            <button type="button" class="btn-cancel" onclick="window.history.back()">
+                <i class="fas fa-times"></i> Отмена
+            </button>
+            <button type="button" class="btn-delete" onclick="deleteRecipe()">
+                <i class="fas fa-trash"></i> Удалить рецепт
+            </button>
+        </div>
     </form>
 </div>
-{% endif %}
-{% endblock %}
 
-{% block scripts %}
-{% if user.is_authenticated and user.is_admin %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Получаем ID рецепта из URL
-    const pathParts = window.location.pathname.split('/');
-    const recipeId = pathParts[pathParts.length - 1];
-    
-    if(recipeId) {
-        loadRecipe(recipeId);
-    }
-});
+const recipeId = document.getElementById('recipe_id').value;
 
-async function loadRecipe(id) {
-    try {
-        const response = await fetch(`/api/recipes/${id}`);
-        
-        if(response.ok) {
-            const recipe = await response.json();
-            renderForm(recipe);
-        } else {
-            showError('Рецепт не найден');
-        }
-    } catch (error) {
-        showError('Ошибка загрузки рецепта');
-    }
-}
-
-function renderForm(recipe) {
-    // Скрываем загрузку
-    document.getElementById('loading').style.display = 'none';
+// Сохранение изменений
+document.getElementById('edit-recipe-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
     
-    // Показываем форму
-    const form = document.getElementById('edit-recipe-form');
-    form.style.display = 'block';
-    
-    // Заполняем форму данными
-    document.getElementById('title').value = recipe.title;
-    document.getElementById('description').value = recipe.description || '';
-    document.getElementById('category').value = recipe.category;
-    document.getElementById('cooking_time').value = recipe.cooking_time;
-    document.getElementById('difficulty').value = recipe.difficulty;
-    document.getElementById('servings').value = recipe.servings || 4;
-    document.getElementById('image_url').value = recipe.image_url || '';
-    
-    // Заполняем ингредиенты
-    const ingredientsList = document.getElementById('ingredients-list');
-    ingredientsList.innerHTML = '';
-    
-    recipe.ingredients.forEach((ingredient, index) => {
-        const newItem = document.createElement('div');
-        newItem.className = 'ingredient-item';
-        newItem.innerHTML = `
-            <input type="text" class="ingredient-input" value="${ingredient}">
-            <button type="button" class="btn-remove-ingredient" onclick="removeIngredient(this)">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        ingredientsList.appendChild(newItem);
-    });
-    
-    // Добавляем пустое поле для нового ингредиента
-    addIngredient();
-    
-    // Заполняем шаги
-    const stepsList = document.getElementById('steps-list');
-    stepsList.innerHTML = '';
-    
-    recipe.steps.forEach((step, index) => {
-        const newItem = document.createElement('div');
-        newItem.className = 'step-item';
-        newItem.innerHTML = `
-            <div class="step-number">${index + 1}</div>
-            <textarea class="step-input">${step}</textarea>
-            <button type="button" class="btn-remove-step" onclick="removeStep(this)">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        stepsList.appendChild(newItem);
-    });
-    
-    // Добавляем пустое поле для нового шага
-    addStep();
-    
-    // Обновляем обработчик формы
-    form.onsubmit = async function(e) {
-        e.preventDefault();
-        await updateRecipe(recipe.id);
+    const formData = {
+        title: document.getElementById('title').value,
+        description: document.getElementById('description').value,
+        ingredients: document.getElementById('ingredients').value.split('\n').filter(i => i.trim()),
+        steps: document.getElementById('steps').value.split('\n').filter(s => s.trim()),
+        cooking_time: document.getElementById('cooking_time').value,
+        difficulty: document.getElementById('difficulty').value,
+        category: document.getElementById('category').value,
+        image_url: document.getElementById('image_url').value || '/static/img/default.jpg'
     };
-}
-
-async function updateRecipe(id) {
-    if(!validateForm()) {
-        return;
-    }
     
-    const formData = collectFormData();
-    
-    const submitBtn = document.querySelector('.btn-submit');
+    const submitBtn = this.querySelector('.btn-submit');
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
     submitBtn.disabled = true;
     
     try {
-        const response = await fetch(`/api/recipes/${id}`, {
+        const response = await fetch(`/api/recipes/${recipeId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -147,35 +126,79 @@ async function updateRecipe(id) {
         
         const data = await response.json();
         
-        if(response.ok) {
-            showNotification('Рецепт успешно обновлен!', 'success');
-            setTimeout(() => {
-                window.location.href = '/admin';
-            }, 2000);
+        if (response.ok) {
+            alert('✅ Рецепт успешно обновлен!');
+            window.location.href = '/admin';
         } else {
-            showNotification(data.error || 'Ошибка сохранения', 'error');
+            alert('❌ Ошибка: ' + data.error);
         }
     } catch (error) {
-        showNotification('Ошибка сети', 'error');
-        console.error('Update error:', error);
+        alert('❌ Ошибка сети');
     } finally {
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
-}
+});
 
-function showError(message) {
-    document.getElementById('loading').innerHTML = `
-        <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ff6b6b;"></i>
-        <h3>${message}</h3>
-        <a href="/admin" class="btn-login" style="margin-top: 20px;">
-            <i class="fas fa-arrow-left"></i> Вернуться в админку
-        </a>
-    `;
+// Удаление рецепта
+function deleteRecipe() {
+    if (!confirm('Вы уверены, что хотите удалить этот рецепт?')) {
+        return;
+    }
+    
+    fetch(`/api/recipes/${recipeId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert('✅ ' + data.message);
+            window.location.href = '/admin';
+        } else {
+            alert('❌ Ошибка: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('❌ Ошибка сети');
+    });
 }
-
-// Используем те же функции из add_recipe.html
-// (addIngredient, removeIngredient, addStep, removeStep, validateForm, collectFormData)
 </script>
-{% endif %}
+
+<style>
+.edit-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.edit-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    border-radius: 20px;
+    color: white;
+}
+
+.btn-delete {
+    background: #ff6b6b;
+    color: white;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-delete:hover {
+    background: #ff4757;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+}
+</style>
 {% endblock %}
