@@ -245,12 +245,26 @@ def api_add_recipe():
         except (ValueError, TypeError):
             return jsonify({'error': 'Время приготовления должно быть числом'}), 400
         
+        # Обработка ингредиентов - преобразуем список в текст
+        ingredients_data = data['ingredients']
+        if isinstance(ingredients_data, list):
+            ingredients_text = '\n'.join([str(item).strip() for item in ingredients_data if str(item).strip()])
+        else:
+            ingredients_text = str(ingredients_data).strip()
+        
+        # Обработка шагов - преобразуем список в текст
+        steps_data = data['steps']
+        if isinstance(steps_data, list):
+            steps_text = '\n'.join([str(item).strip() for item in steps_data if str(item).strip()])
+        else:
+            steps_text = str(steps_data).strip()
+        
         # Создание рецепта
         recipe = Recipe(
-            title=data['title'].strip(),
-            description=data.get('description', '').strip(),
-            ingredients=data['ingredients'].strip(),
-            steps=data['steps'].strip(),
+            title=str(data['title']).strip(),
+            description=str(data.get('description', '')).strip(),
+            ingredients=ingredients_text,
+            steps=steps_text,
             cooking_time=cooking_time_int,
             difficulty=data.get('difficulty', 'Средний'),
             category=data.get('category', 'Основное'),
@@ -267,7 +281,11 @@ def api_add_recipe():
         }), 201
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 # Обновить рецепт (только админ)
 @app.route('/api/recipes/<int:recipe_id>', methods=['PUT'])
@@ -281,24 +299,24 @@ def api_update_recipe(recipe_id):
         data = request.json
         
         if 'title' in data:
-            recipe.title = data['title'].strip()
+            recipe.title = str(data['title']).strip()
         
         if 'description' in data:
-            recipe.description = data['description'].strip()
+            recipe.description = str(data['description']).strip()
         
         if 'ingredients' in data:
             ingredients_data = data['ingredients']
             if isinstance(ingredients_data, list):
-                recipe.ingredients = '\n'.join([str(item).strip() for item in ingredients_data])
+                recipe.ingredients = '\n'.join([str(item).strip() for item in ingredients_data if str(item).strip()])
             else:
-                recipe.ingredients = ingredients_data.strip()
+                recipe.ingredients = str(ingredients_data).strip()
         
         if 'steps' in data:
             steps_data = data['steps']
             if isinstance(steps_data, list):
-                recipe.steps = '\n'.join([str(item).strip() for item in steps_data])
+                recipe.steps = '\n'.join([str(item).strip() for item in steps_data if str(item).strip()])
             else:
-                recipe.steps = steps_data.strip()
+                recipe.steps = str(steps_data).strip()
         
         if 'cooking_time' in data:
             try:
@@ -323,7 +341,11 @@ def api_update_recipe(recipe_id):
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 # Удалить рецепт (только админ)
 @app.route('/api/recipes/<int:recipe_id>', methods=['DELETE'])
