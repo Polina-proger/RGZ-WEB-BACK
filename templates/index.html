@@ -79,34 +79,89 @@
 <script>
 async function viewRecipe(id) {
     try {
-        // 1. Делаем запрос к API
         const response = await fetch(`/api/recipes/${id}`);
-        
-        // 2. Проверяем статус ответа
         if (!response.ok) {
             throw new Error(`Ошибка сервера: ${response.status}`);
         }
         
-        // 3. Парсим JSON
         const result = await response.json();
-        
-        // 4. Важно! Данные находятся в result.recipe, а не в result напрямую
         const recipe = result.recipe;
         
         if (!recipe) {
             throw new Error('Рецепт не найден в ответе сервера');
         }
         
-        // 5. Форматируем ингредиенты и шаги
-        const ingredients = Array.isArray(recipe.ingredients) 
-            ? recipe.ingredients.join('\n• ') 
-            : (recipe.ingredients || 'Не указаны');
+        // === УНИВЕРСАЛЬНАЯ ОБРАБОТКА ИНГРЕДИЕНТОВ И ШАГОВ ===
+        function parseIngredientsOrSteps(data) {
+            if (!data) return [];
+            
+            // Если это уже нормальный массив (локальная версия)
+            if (Array.isArray(data)) {
+                // Проверяем, не является ли это массивом с одной строкой
+                if (data.length === 1 && typeof data[0] === 'string') {
+                    const firstItem = data[0];
+                    // Проверяем, похоже ли это на строку "['item1', 'item2']"
+                    if (firstItem.startsWith('[') && firstItem.endsWith(']')) {
+                        return parseStringArray(firstItem);
+                    }
+                }
+                return data; // Просто возвращаем нормальный массив
+            }
+            
+            // Если это строка (на всякий случай)
+            if (typeof data === 'string') {
+                return parseStringArray(data);
+            }
+            
+            return [];
+        }
         
-        const steps = Array.isArray(recipe.steps) 
-            ? recipe.steps.join('\n\n') 
-            : (recipe.steps || 'Не указаны');
+        function parseStringArray(str) {
+            str = str.trim();
+            
+            // Убираем внешние квадратные скобки
+            if (str.startsWith('[') && str.endsWith(']')) {
+                str = str.slice(1, -1).trim();
+            }
+            
+            if (!str) return [];
+            
+            try {
+                // Пробуем разобрать как JSON (меняем одинарные на двойные кавычки)
+                const jsonStr = str.replace(/'/g, '"');
+                return JSON.parse(`[${jsonStr}]`);
+            } catch (e) {
+                // Если не получается, разделяем вручную
+                const items = str.split(/\s*,\s*/)
+                    .map(item => {
+                        // Убираем кавычки с начала и конца
+                        item = item.trim();
+                        if ((item.startsWith("'") && item.endsWith("'")) || 
+                            (item.startsWith('"') && item.endsWith('"'))) {
+                            item = item.slice(1, -1);
+                        }
+                        return item;
+                    })
+                    .filter(item => item.length > 0);
+                
+                return items;
+            }
+        }
         
-        // 6. Создаем читаемое сообщение
+        // Получаем обработанные данные
+        const ingredientsList = parseIngredientsOrSteps(recipe.ingredients);
+        const stepsList = parseIngredientsOrSteps(recipe.steps);
+        
+        // Форматируем для вывода
+        const ingredients = ingredientsList.length > 0 
+            ? ingredientsList.join('\n• ') 
+            : 'Не указаны';
+            
+        const steps = stepsList.length > 0 
+            ? stepsList.join('\n\n') 
+            : 'Не указаны';
+        
+        // Создаем сообщение
         const message = 
             `🍽️ ${recipe.title || 'Без названия'}\n\n` +
             `⏰ Время: ${recipe.cooking_time || 0} минут\n` +
@@ -115,7 +170,7 @@ async function viewRecipe(id) {
             `📝 Ингредиенты:\n• ${ingredients}\n\n` +
             `👩‍🍳 Шаги приготовления:\n${steps}`;
         
-        // 7. Показываем пользователю
+        // Показываем пользователю
         alert(message);
         
     } catch (error) {
