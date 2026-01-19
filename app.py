@@ -212,7 +212,7 @@ def get_all_recipes():
 
 # Получить один рецепт
 @app.route('/api/recipes/<int:recipe_id>')
-def get_recipe_by_id(recipe_id): 
+def get_recipe(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
     return jsonify({'recipe': recipe.to_dict()})
 
@@ -287,9 +287,9 @@ def api_add_recipe():
             'traceback': traceback.format_exc()
         }), 500
 
-# Обновить рецепт (только админ)
-@app.route('/api/recipes/update/<int:recipe_id>', methods=['PUT'])
-def api_update_recipe(recipe_id):
+# Обновить рецепт (только админ) - ИЗМЕНЕНО ИМЯ ФУНКЦИИ
+@app.route('/api/recipes/<int:recipe_id>/update', methods=['PUT'])
+def api_update_recipe_by_id(recipe_id):
     if not session.get('is_admin'):
         return jsonify({'error': 'Требуются права администратора'}), 403
     
@@ -347,9 +347,9 @@ def api_update_recipe(recipe_id):
             'traceback': traceback.format_exc()
         }), 500
 
-# Удалить рецепт (только админ)
-@app.route('/api/recipes/<int:recipe_id>', methods=['DELETE'])
-def api_delete_recipe(recipe_id):
+# Удалить рецепт (только админ) - ИЗМЕНЕНО ИМЯ ФУНКЦИИ
+@app.route('/api/recipes/<int:recipe_id>/delete', methods=['DELETE'])
+def api_delete_recipe_by_id(recipe_id):
     if not session.get('is_admin'):
         return jsonify({'error': 'Требуются права администратора'}), 403
     
