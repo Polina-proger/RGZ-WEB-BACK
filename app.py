@@ -59,19 +59,46 @@ class Recipe(db.Model):
         }
     
     def get_ingredients_list(self):
-        """Получить ингредиенты как список"""
+        """Получить ингредиенты как список (исправленная версия)"""
         if not self.ingredients:
             return []
         
-        if self.ingredients.strip().startswith('['):
+        # Если это строка с Python-списком
+        if self.ingredients.strip().startswith('[') and self.ingredients.strip().endswith(']'):
             try:
-                ingredients_data = json.loads(self.ingredients)
+                # Убираем лишние кавычки и преобразуем
+                ingredients_str = self.ingredients.strip()
+                # Заменяем одиночные кавычки на двойные для корректного JSON
+                ingredients_str = ingredients_str.replace("'", '"')
+                ingredients_data = json.loads(ingredients_str)
                 if isinstance(ingredients_data, list):
                     return ingredients_data
-            except:
+            except Exception as e:
+                print(f"Ошибка парсинга ингредиентов: {e}")
                 pass
         
+        # Если это обычный текст с переносами строк
         return [line.strip() for line in self.ingredients.split('\n') if line.strip()]
+    
+    def get_steps_list(self):
+        """Получить шаги как список (исправленная версия)"""
+        if not self.steps:
+            return []
+        
+        # Если это строка с Python-списком
+        if self.steps.strip().startswith('[') and self.steps.strip().endswith(']'):
+            try:
+                steps_str = self.steps.strip()
+                steps_str = steps_str.replace("'", '"')
+                steps_data = json.loads(steps_str)
+                if isinstance(steps_data, list):
+                    return steps_data
+            except Exception as e:
+                print(f"Ошибка парсинга шагов: {e}")
+                pass
+        
+        # Если это обычный текст с переносами строк
+        return [line.strip() for line in self.steps.split('\n') if line.strip()]
     
     def get_steps_list(self):
         """Получить шаги как список"""
@@ -554,4 +581,3 @@ if __name__ == '__main__':
     print("=" * 50)
     
     app.run(debug=True, host='0.0.0.0', port=5001)
-    
