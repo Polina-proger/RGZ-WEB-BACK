@@ -84,7 +84,8 @@ async function viewRecipe(id) {
             throw new Error('Рецепт не найден');
         }
         
-        const recipe = await response.json();
+        const data = await response.json();
+        const recipe = data.recipe;
         
         // Формируем содержимое для модального окна
         const ingredients = Array.isArray(recipe.ingredients) ? 
