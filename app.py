@@ -212,7 +212,7 @@ def get_all_recipes():
 
 # Получить один рецепт
 @app.route('/api/recipes/<int:recipe_id>')
-def get_recipe(recipe_id):
+def get_recipe_by_id(recipe_id): 
     recipe = Recipe.query.get_or_404(recipe_id)
     return jsonify({'recipe': recipe.to_dict()})
 
