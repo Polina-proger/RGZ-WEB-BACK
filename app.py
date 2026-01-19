@@ -288,7 +288,7 @@ def api_add_recipe():
         }), 500
 
 # Обновить рецепт (только админ)
-@app.route('/api/recipes/<int:recipe_id>', methods=['PUT'])
+@app.route('/api/recipes/update/<int:recipe_id>', methods=['PUT'])
 def api_update_recipe(recipe_id):
     if not session.get('is_admin'):
         return jsonify({'error': 'Требуются права администратора'}), 403
