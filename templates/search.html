@@ -281,21 +281,107 @@ function showError(message) {
 }
 
 // Функция для просмотра рецепта
-function viewRecipe(id) {
-    fetch(`/api/recipes/${id}`)
-        .then(response => response.json())
-        .then(recipe => {
-            const ingredients = Array.isArray(recipe.ingredients) ? 
-                recipe.ingredients.join('\n- ') : recipe.ingredients || 'Не указаны';
-            const steps = Array.isArray(recipe.steps) ? 
-                recipe.steps.join('\n\n') : recipe.steps || 'Не указаны';
+// Функция для просмотра рецепта (такая же как в index.html)
+async function viewRecipe(id) {
+    try {
+        const response = await fetch(`/api/recipes/${id}`);
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        const recipe = result.recipe;
+        
+        if (!recipe) {
+            throw new Error('Рецепт не найден в ответе сервера');
+        }
+        
+        // === УНИВЕРСАЛЬНАЯ ОБРАБОТКА ИНГРЕДИЕНТОВ И ШАГОВ ===
+        function parseIngredientsOrSteps(data) {
+            if (!data) return [];
             
-            alert(`${recipe.title}\n\nВремя: ${recipe.cooking_time || 0} минут\nСложность: ${recipe.difficulty || 'Не указано'}\nКатегория: ${recipe.category || 'Без категории'}\n\nИнгредиенты:\n- ${ingredients}\n\nШаги приготовления:\n${steps}`);
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Не удалось загрузить рецепт');
-        });
+            // Если это уже нормальный массив (локальная версия)
+            if (Array.isArray(data)) {
+                // Проверяем, не является ли это массивом с одной строкой
+                if (data.length === 1 && typeof data[0] === 'string') {
+                    const firstItem = data[0];
+                    // Проверяем, похоже ли это на строку "['item1', 'item2']"
+                    if (firstItem.startsWith('[') && firstItem.endsWith(']')) {
+                        return parseStringArray(firstItem);
+                    }
+                }
+                return data; // Просто возвращаем нормальный массив
+            }
+            
+            // Если это строка (на всякий случай)
+            if (typeof data === 'string') {
+                return parseStringArray(data);
+            }
+            
+            return [];
+        }
+        
+        function parseStringArray(str) {
+            str = str.trim();
+            
+            // Убираем внешние квадратные скобки
+            if (str.startsWith('[') && str.endsWith(']')) {
+                str = str.slice(1, -1).trim();
+            }
+            
+            if (!str) return [];
+            
+            try {
+                // Пробуем разобрать как JSON (меняем одинарные на двойные кавычки)
+                const jsonStr = str.replace(/'/g, '"');
+                return JSON.parse(`[${jsonStr}]`);
+            } catch (e) {
+                // Если не получается, разделяем вручную
+                const items = str.split(/\s*,\s*/)
+                    .map(item => {
+                        // Убираем кавычки с начала и конца
+                        item = item.trim();
+                        if ((item.startsWith("'") && item.endsWith("'")) || 
+                            (item.startsWith('"') && item.endsWith('"'))) {
+                            item = item.slice(1, -1);
+                        }
+                        return item;
+                    })
+                    .filter(item => item.length > 0);
+                
+                return items;
+            }
+        }
+        
+        // Получаем обработанные данные
+        const ingredientsList = parseIngredientsOrSteps(recipe.ingredients);
+        const stepsList = parseIngredientsOrSteps(recipe.steps);
+        
+        // Форматируем для вывода
+        const ingredients = ingredientsList.length > 0 
+            ? ingredientsList.join('\n• ') 
+            : 'Не указаны';
+            
+        const steps = stepsList.length > 0 
+            ? stepsList.join('\n\n') 
+            : 'Не указаны';
+        
+        // Создаем сообщение
+        const message = 
+            `🍽️ ${recipe.title || 'Без названия'}\n\n` +
+            `⏰ Время: ${recipe.cooking_time || 0} минут\n` +
+            `🔥 Сложность: ${recipe.difficulty || 'Не указано'}\n` +
+            `🏷️ Категория: ${recipe.category || 'Без категории'}\n\n` +
+            `📝 Ингредиенты:\n• ${ingredients}\n\n` +
+            `👩‍🍳 Шаги приготовления:\n${steps}`;
+        
+        // Показываем пользователю
+        alert(message);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки рецепта:', error);
+        alert(`Не удалось загрузить рецепт.\n\nОшибка: ${error.message}`);
+    }
 }
 </script>
 
@@ -330,7 +416,7 @@ function viewRecipe(id) {
 .search-results { margin-top: 60px; }
 .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
 .results-info { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; font-size: 0.9rem; color: var(--text); }
-.recipes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 30px; margin-top: 30px; }
+.recipes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 30px; margin-top: 30px; }
 .recipe-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; border: 2px solid transparent; }
 .recipe-card:hover { transform: translateY(-10px); border-color: #ff85a2; box-shadow: 0 15px 30px rgba(255, 133, 162, 0.2); }
 .recipe-image { width: 100%; height: 200px; object-fit: cover; border-bottom: 3px solid #ffd166; }
@@ -348,5 +434,30 @@ function viewRecipe(id) {
 .loading i { font-size: 3rem; color: var(--primary); margin-bottom: 20px; }
 .no-results i { font-size: 3rem; color: var(--primary); margin-bottom: 20px; }
 .error i { font-size: 3rem; color: #ff6b6b; margin-bottom: 20px; }
+/* Сетка рецептов на всю ширину */
+.recipes-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px;
+    margin-top: 30px;
+    /* Добавьте эти 4 строки: */
+    max-width: 100vw;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    padding: 0 20px;
+}
+
+/* Уберите ограничения у контейнера результатов */
+.search-results {
+    overflow: visible;
+    max-width: none;
+}
+
+/* Гарантируем, что карточки растягиваются */
+.recipe-card {
+    min-width: 0;
+    width: 100%;
+}
 </style>
 {% endblock %}

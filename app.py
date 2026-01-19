@@ -178,7 +178,7 @@ def init_database():
 
 @app.route('/')
 def index():
-    recipes = Recipe.query.order_by(Recipe.created_at.desc()).limit(12).all()
+    recipes = Recipe.query.order_by(Recipe.created_at.desc()).all()
     return render_template('index.html', recipes=recipes)
 
 @app.route('/search')

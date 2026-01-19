@@ -3,18 +3,22 @@
 {% block title %}Главная - Рецепты Полины{% endblock %}
 
 {% block content %}
-<div class="hero-section">
-    <div class="hero-content">
-        <h2><i class="fas fa-heart"></i> Добро пожаловать в мир вкусных рецептов!</h2>
-        <p>Более 100 проверенных рецептов для каждого дня</p>
+<div class="hero-section full-width">
+    <div class="container">  
+        <div class="hero-content">
+            <h2><i class="fas fa-heart"></i> Добро пожаловать в мир вкусных рецептов!</h2>
+            <p>Более 100 проверенных рецептов для каждого дня</p>
+        </div>
     </div>
 </div>
 
-<div class="featured-recipes">
-    <h3><i class="fas fa-crown"></i> Популярные рецепты</h3>
+<div class="featured-recipes full-width">
+    <div class="container">
+        <h3><i class="fas fa-crown"></i> Популярные рецепты</h3>
+    </div>
     
     {% if recipes %}
-    <div class="recipes-grid">
+    <div class="recipes-grid no-container">
         {% for recipe in recipes %}
         <div class="recipe-card">
             <img src="{{ recipe.image_url or '/static/img/default.jpg' }}" 
@@ -80,60 +84,102 @@
 async function viewRecipe(id) {
     try {
         const response = await fetch(`/api/recipes/${id}`);
-        if (!response.ok) throw new Error('Рецепт не найден');
-        
-        const data = await response.json();
-        const recipe = data.recipe;
-        
-        if (!recipe) throw new Error('Нет данных рецепта');
-        
-        // === ПРОСТАЯ ОБРАБОТКА ДАННЫХ ===
-        function formatData(rawData) {
-            if (!rawData) return 'Не указаны';
-            
-            // Если это массив
-            if (Array.isArray(rawData)) {
-                // Берем первый элемент (для PythonAnywhere)
-                let firstItem = rawData[0];
-                
-                // Если первый элемент строка и содержит список
-                if (typeof firstItem === 'string' && 
-                    firstItem.includes('[') && firstItem.includes(']')) {
-                    
-                    // Упрощенная обработка строки типа "['item1', 'item2']"
-                    firstItem = firstItem.replace(/[\[\]']/g, '');
-                    const items = firstItem.split(',').map(item => item.trim());
-                    return items.join('\n• ');
-                }
-                
-                // Если это нормальный массив строк
-                return rawData.join('\n• ');
-            }
-            
-            // Если это просто строка
-            if (typeof rawData === 'string') {
-                return rawData;
-            }
-            
-            return 'Не указаны';
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
         }
         
-        const ingredients = formatData(recipe.ingredients);
-        const steps = formatData(recipe.steps);
+        const result = await response.json();
+        const recipe = result.recipe;
         
-        // Простое сообщение
-        alert(
+        if (!recipe) {
+            throw new Error('Рецепт не найден в ответе сервера');
+        }
+        
+        // === УНИВЕРСАЛЬНАЯ ОБРАБОТКА ИНГРЕДИЕНТОВ И ШАГОВ ===
+        function parseIngredientsOrSteps(data) {
+            if (!data) return [];
+            
+            // Если это уже нормальный массив (локальная версия)
+            if (Array.isArray(data)) {
+                // Проверяем, не является ли это массивом с одной строкой
+                if (data.length === 1 && typeof data[0] === 'string') {
+                    const firstItem = data[0];
+                    // Проверяем, похоже ли это на строку "['item1', 'item2']"
+                    if (firstItem.startsWith('[') && firstItem.endsWith(']')) {
+                        return parseStringArray(firstItem);
+                    }
+                }
+                return data; // Просто возвращаем нормальный массив
+            }
+            
+            // Если это строка (на всякий случай)
+            if (typeof data === 'string') {
+                return parseStringArray(data);
+            }
+            
+            return [];
+        }
+        
+        function parseStringArray(str) {
+            str = str.trim();
+            
+            // Убираем внешние квадратные скобки
+            if (str.startsWith('[') && str.endsWith(']')) {
+                str = str.slice(1, -1).trim();
+            }
+            
+            if (!str) return [];
+            
+            try {
+                // Пробуем разобрать как JSON (меняем одинарные на двойные кавычки)
+                const jsonStr = str.replace(/'/g, '"');
+                return JSON.parse(`[${jsonStr}]`);
+            } catch (e) {
+                // Если не получается, разделяем вручную
+                const items = str.split(/\s*,\s*/)
+                    .map(item => {
+                        // Убираем кавычки с начала и конца
+                        item = item.trim();
+                        if ((item.startsWith("'") && item.endsWith("'")) || 
+                            (item.startsWith('"') && item.endsWith('"'))) {
+                            item = item.slice(1, -1);
+                        }
+                        return item;
+                    })
+                    .filter(item => item.length > 0);
+                
+                return items;
+            }
+        }
+        
+        // Получаем обработанные данные
+        const ingredientsList = parseIngredientsOrSteps(recipe.ingredients);
+        const stepsList = parseIngredientsOrSteps(recipe.steps);
+        
+        // Форматируем для вывода
+        const ingredients = ingredientsList.length > 0 
+            ? ingredientsList.join('\n• ') 
+            : 'Не указаны';
+            
+        const steps = stepsList.length > 0 
+            ? stepsList.join('\n\n') 
+            : 'Не указаны';
+        
+        // Создаем сообщение
+        const message = 
             `🍽️ ${recipe.title || 'Без названия'}\n\n` +
-            `⏰ Время: ${recipe.cooking_time || 0} мин\n` +
+            `⏰ Время: ${recipe.cooking_time || 0} минут\n` +
             `🔥 Сложность: ${recipe.difficulty || 'Не указано'}\n` +
             `🏷️ Категория: ${recipe.category || 'Без категории'}\n\n` +
             `📝 Ингредиенты:\n• ${ingredients}\n\n` +
-            `👩‍🍳 Шаги:\n${steps}`
-        );
+            `👩‍🍳 Шаги приготовления:\n${steps}`;
+        
+        // Показываем пользователю
+        alert(message);
         
     } catch (error) {
-        console.error('Ошибка:', error);
-        alert('Ошибка загрузки рецепта');
+        console.error('Ошибка загрузки рецепта:', error);
+        alert(`Не удалось загрузить рецепт.\n\nОшибка: ${error.message}`);
     }
 }
 
@@ -285,10 +331,12 @@ function viewRecipePage(id) {
 }
 
 .feature-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
     gap: 30px;
     margin: 60px 0;
+    padding: 0 20px; /* Добавил отступы по краям */
 }
 
 .feature-card {
@@ -309,6 +357,62 @@ function viewRecipePage(id) {
     font-size: 3rem;
     color: #ff85a2;
     margin-bottom: 20px;
+}
+/* Добавьте этот стиль в блок <style> (можно после .hero-section) */
+.hero-section.full-width {
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    border-radius: 0; /* Убираем скругление углов */
+}
+
+/* Остальные стили hero-section остаются без изменений */
+.hero-section {
+    background: linear-gradient(135deg, #ff85a2 0%, #ffd166 100%);
+    padding: 60px 40px;
+    margin: 0; /* Убираем margin, так как full-width сам управляет отступами */
+    color: white;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(255, 133, 162, 0.3);
+}
+/* Полная ширина для секции */
+.featured-recipes.full-width {
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+}
+
+/* Сетка без контейнера */
+.recipes-grid.no-container {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px;
+    padding: 0 20px; /* Небольшие отступы по краям */
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Обязательно для карточек */
+.recipe-card {
+    min-width: 0;
+    width: 100%;
+}
+/* ДОБАВЬТЕ ЭТО В КОНЕЦ СТИЛЕЙ ГЛАВНОЙ СТРАНИЦЫ */
+.featured-recipes {
+    margin: 60px 0;
+}
+
+.recipes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 30px;
+    margin-top: 30px;
 }
 
 @media (max-width: 768px) {
